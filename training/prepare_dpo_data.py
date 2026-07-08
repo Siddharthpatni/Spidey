@@ -105,13 +105,15 @@ def generate_pairs(n: int, seed: int = 3407) -> List[Dict[str, Any]]:
     """Raw (messages, chosen, rejected) triples, before chat-template rendering."""
     random.seed(seed + 1)  # offset so pairs don't mirror the SFT set exactly
     out = []
-    # Oversample: the SFT set includes persona-chat examples (no tool call),
-    # which aren't decision pairs — skip those and keep n tool-call pairs.
-    for ex in generate_synthetic(n + n // 4 + 8, seed=seed):
+    # Oversample: the SFT set includes persona chats and plan calls, which
+    # aren't decision pairs — skip those and keep n tool-call pairs.
+    for ex in generate_synthetic(n * 2 + 16, seed=seed):
         *context, chosen = ex["messages"]  # [system?, user], assistant
         if not chosen.get("tool_calls"):
             continue
         call = chosen["tool_calls"][0]["function"]
+        if call["name"] not in _WRONG_TOOL:  # e.g. `plan` — not a decision pair
+            continue
         mode, rejected = _reject(call["name"], call["arguments"])
         out.append({"context": context, "chosen": chosen, "rejected": rejected, "mode": mode})
         if len(out) >= n:

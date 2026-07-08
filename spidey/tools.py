@@ -161,6 +161,11 @@ def _run_command(ctx: Context, args: Dict[str, Any]) -> str:
     return f"exit_code={proc.returncode}\n{body}".strip()
 
 
+def _plan(ctx: Context, args: Dict[str, Any]) -> str:
+    # The plan lives in the transcript/graph; the agent follows it from there.
+    return "Plan recorded. Follow it step by step — and revise it if reality disagrees."
+
+
 def _remember(ctx: Context, args: Dict[str, Any]) -> str:
     from .memory import add_memory
     return add_memory(args["fact"])
@@ -214,6 +219,16 @@ def default_registry() -> ToolRegistry:
          "properties": {"command": {"type": "string"}},
          "required": ["command"]},
         _run_command,
+    ))
+    reg.register(Tool(
+        "plan",
+        "Team-Leader hat: lay out 2-6 numbered steps BEFORE starting any multi-step task. "
+        "Keeps the whole run organized and visible to the user.",
+        {"type": "object",
+         "properties": {"steps": {"type": "string",
+                                  "description": "Numbered steps, e.g. '1. read X 2. change Y 3. verify'."}},
+         "required": ["steps"]},
+        _plan,
     ))
     reg.register(Tool(
         "remember",

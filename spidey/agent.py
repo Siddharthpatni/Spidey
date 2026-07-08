@@ -36,10 +36,21 @@ Creed — "with great power comes great responsibility":
 - Finish the job: after changing something, run or test it to prove it works.
 - The user's data stays on this machine; never leave the working directory.
 
-You are also the user's personal assistant and friend: listen first, advise honestly
+You are also the user's personal assistant and FRIEND: listen first, advise honestly
 and practically, and when they share something that matters (name, preferences,
-projects, dates), save it with the `remember` tool. What you remember is injected
-below — use it naturally, like a friend would.
+projects, dates, worries), save it with the `remember` tool. What you remember is
+injected below — use it naturally, like a friend would. When they share feelings or
+problems, be the friend before the engineer: acknowledge first, then help — not
+everything needs a tool.
+
+You are a one-hero web-team — switch hats as the work demands:
+- Team Leader / Organizer: for any multi-step task, FIRST call `plan` with 2-6
+  numbered steps, then follow them in order.
+- Researcher: inspect before acting. Creator: build it. Notetaker: factual finish
+  summaries, and `remember` what matters.
+- Editor / Devil's Advocate: your finish triggers a critical review of changed
+  work — address its findings instead of arguing with them.
+- Harmonizer: with the user, listen first and keep it warm.
 
 Act by calling the provided tools, one per turn, inside the working directory:
 inspect first (read_file / list_directory / search_code), make small verifiable
@@ -55,6 +66,50 @@ When writing code, climb the ponytail ladder and stop at the first rung that wor
 beats clever; fix root causes, not symptoms. Never lazy about: understanding the
 problem first, validation at trust boundaries, error handling, and checking
 non-trivial logic actually runs."""
+
+
+# Specialist hats — the router picks up to two per task from keywords, so each
+# run gets expert framing without paying prompt-tokens for 40 roles every step.
+SPECIALIST_HATS: Dict[str, tuple] = {
+    "CODING": (("code", "bug", "function", "refactor", "test", "debug", "script",
+                "compile", "python", "javascript", "class ", "error"),
+               "Hat CODING ASSISTANT: read the code first; smallest correct diff; "
+               "run it or its tests to verify."),
+    "FILE MANAGER": (("file", "folder", "organize", "rename", "duplicate", "sort",
+                      "archive", "clean up", "downloads"),
+                     "Hat FILE MANAGER: list before moving; never destroy without "
+                     "approval; report exactly what moved where."),
+    "SYSADMIN": (("cpu", "ram", "disk", "memory", "process", "service", "docker",
+                  "install", "update", "log", "port"),
+                 "Hat SYSTEM ADMIN: diagnose with read-only commands first; change "
+                 "state only with a stated reason."),
+    "DATA ANALYST": (("csv", "data", "sql", "statistic", "average", "chart",
+                      "spreadsheet", "json", "count"),
+                     "Hat DATA ANALYST: inspect a sample first; state assumptions; "
+                     "verify numbers by recomputing, not by eye."),
+    "RESEARCHER": (("research", "summarize", "summarise", "compare", "explain",
+                    "what does", "readme", "docs"),
+                   "Hat RESEARCHER: quote the actual file, separate facts from "
+                   "guesses, cite paths for every claim."),
+    "WRITER": (("write", "draft", "email", "report", "letter", "blog", "story",
+                "poem", "notes"),
+               "Hat WRITER: match the asked tone and length; structure first, "
+               "prose second."),
+    "TUTOR": (("teach", "learn", "quiz", "explain like", "homework", "flashcard",
+               "step by step"),
+              "Hat TUTOR: explain step by step, one idea at a time, and end with "
+              "one check-understanding question."),
+    "SECURITY": (("virus", "malware", "phishing", "suspicious", "hack", "password",
+                  "security", "scan"),
+                 "Hat SECURITY: unknown code is hostile until read; analyze villains, "
+                 "never execute them."),
+}
+
+
+def _pick_hats(task: str) -> List[tuple]:
+    lowered = task.lower()
+    return [(name, text) for name, (keys, text) in SPECIALIST_HATS.items()
+            if any(k in lowered for k in keys)][:2]
 
 
 # Every Spider across the timeline keeps the creed; only the voice changes.
@@ -154,6 +209,31 @@ class Agent:
         self._emit("approval_result", approved=approved)
         return approved
 
+    def _editor_review(self, task: str, transcript: List[Dict[str, Any]],
+                       summary: str) -> Optional[str]:
+        """One extra model call wearing the Editor/Devil's-Advocate hat.
+        Returns a problem statement, or None to approve. Fails open — a broken
+        reviewer must never block the team."""
+        actions = "\n".join(
+            f"- {t['tool']} {json.dumps(t['args'])[:120]}" for t in transcript[-10:])
+        try:
+            reply = self.backend.chat([
+                {"role": "system",
+                 "content": "You are the Editor and Devil's Advocate of a team reviewing a "
+                            "teammate's finished work. Be tough but fair. If the actions "
+                            "plausibly fulfil the task, reply exactly APPROVE. Otherwise "
+                            "reply ONE short sentence naming the biggest concrete problem."},
+                {"role": "user",
+                 "content": f"Task: {task}\n\nActions taken:\n{actions}\n\n"
+                            f"Teammate's summary: {summary}"},
+            ], [])
+            verdict = (reply.content or "").strip()
+            if not verdict or verdict.upper().startswith("APPROVE") or reply.tool_calls:
+                return None
+            return verdict.splitlines()[0][:200]
+        except Exception:
+            return None
+
     def _default_approve(self, prompt: str) -> bool:
         if not sys.stdin.isatty():
             self._log(_c("  auto-denied (non-interactive session):", "33"), prompt)
@@ -175,6 +255,9 @@ class Agent:
         user/assistant message dicts — so a session can build on itself."""
         specs = self.registry.specs()
         system = SYSTEM_PROMPT + SPIDER_PERSONAS[self.spider]
+        hats = _pick_hats(task)
+        if hats:
+            system += "\n\nSpecialists on this job:\n" + "\n".join(t for _, t in hats)
         memories = load_memories()
         if memories:
             system += "\n\nWhat you remember about your friend:\n" + memories
@@ -184,6 +267,7 @@ class Agent:
             {"role": "user", "content": task},
         ]
         transcript: List[Dict[str, Any]] = []
+        qa_pending = True  # every run earns exactly one Editor review before finishing
         self._step = 0
 
         self._log(_c(f"\n● Task: {task}", "1;36"))
@@ -192,6 +276,9 @@ class Agent:
             f"safety={self.safety.mode}\n", "90"))
         self._emit("task_start", task=task, workdir=str(self.workdir),
                    model=getattr(self.backend, "name", "?"), safety=self.safety.mode)
+        if hats:
+            self._emit("think", text="🕸 Web-team hats on this job: "
+                                     + " + ".join(n for n, _ in hats))
 
         for step in range(1, self.max_steps + 1):
             self._step = step
@@ -237,6 +324,23 @@ class Agent:
 
                 if name == "finish":
                     summary = arguments.get("summary", "")
+                    # Editor / Devil's-Advocate hat: work that changed things gets
+                    # one critical review before it ships. A finding reopens the
+                    # run instead of finishing it. One review per run — no loops.
+                    if qa_pending and any(t["tool"] in ("write_file", "run_command")
+                                          for t in transcript):
+                        qa_pending = False
+                        finding = self._editor_review(task, transcript, summary)
+                        if finding is None:
+                            self._emit("think", text="🧐 Editor hat: reviewed the work — approved.")
+                        if finding:
+                            obs = (f"EDITOR REVIEW (Devil's Advocate): {finding} "
+                                   "Address this, verify, then finish again.")
+                            self._log(_c(f"[{step}] ", "1;35") + _c("review ", "33") + finding)
+                            self._emit("think", text=f"🧐 Editor hat: {finding}")
+                            messages.append({"role": "tool", "tool_call_id": tc["id"],
+                                             "name": "finish", "content": obs})
+                            continue
                     self._log(_c(f"[{step}] ", "1;35") + _c("finish ", "1;32") + summary)
                     self._log(_c("\n✓ Task complete.", "1;32"))
                     self._emit("finish", summary=summary)

@@ -229,6 +229,7 @@ the server with `--https` (one flag; the mic needs a secure page). Details in
 | [docs/API.md](docs/API.md) | the complete wire protocol (`/ws`, `/ws/voice`, auth) — build your own client |
 | [docs/SECURITY.md](docs/SECURITY.md) | threat model, safety layer, token auth, privacy table, deployment guidance |
 | [docs/OFFLINE.md](docs/OFFLINE.md) | the offline story: models, RAM needs, exactly what touches the internet |
+| [docs/CAPABILITIES.md](docs/CAPABILITIES.md) | the 40-role capability matrix — what Spidey can be today, with a key, or on the roadmap |
 | [training/README.md](training/README.md) | SFT → DPO math, persona training, base models, Colab recipes |
 
 ## Deploying it (optional)

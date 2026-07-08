@@ -93,6 +93,43 @@ enjoy the tokens/second. The runtime also keeps latency down independently of
 training: reasoning-model "thinking" is disabled by default and the weights are
 held in RAM between steps (see `spidey/llm.py`).
 
+## Specialist adapters — and training ON your Mac (M-series)
+
+One "everything" fine-tune dilutes; a **wardrobe of small LoRA adapters** specializes.
+Each adapter is megabytes, trains on the same base, and Ollama loads it like any
+model (`ADAPTER` line in a Modelfile). Natural wardrobe for this repo:
+
+- `spidey-coder` — Python/JS/C++ tasks, tests, refactors (SFT source: this folder's
+  synthetic set + a code-instruct dataset)
+- `spidey-files` — file-management decisions
+- `spidey-research` — summarize/compare/cite behaviors
+- `spidey-friend` — persona + listening/advice exchanges
+
+The runtime's role-router (specialist "hats") is adapter-ready: the same routing that
+picks a hat today can pick an adapter tomorrow.
+
+**Can a MacBook Air M4 (16 GB) train these?** Honestly:
+
+| Base size | On-Mac LoRA ([mlx-lm](https://github.com/ml-explore/mlx-lm)) | Free Colab (this repo's scripts) |
+|---|---|---|
+| 1–4 B | ✅ works, hours-scale | ✅ fastest path |
+| 7–8 B | ⚠ tight — 4-bit base + small batches, slow | ✅ recommended |
+| 12 B+ | ❌ not with 16 GB unified memory | ✅ (T4/A100 handles it) |
+
+On-Mac quickstart (Apple's MLX, no CUDA needed):
+
+```bash
+pip install mlx-lm
+mlx_lm.lora --model mlx-community/gemma-3-4b-it-4bit \
+            --train --data ./data --batch-size 1 --iters 600
+mlx_lm.fuse  --model mlx-community/gemma-3-4b-it-4bit --adapter-path adapters
+# export to GGUF → Modelfile → `ollama create spidey-coder`
+```
+
+(`prepare_data.py` writes the conversations; convert to MLX's JSONL chat format with
+a few lines.) Rule of thumb: prototype adapters on the Mac at 1–4 B, do the real runs
+on Colab where this repo's Unsloth scripts already work.
+
 ## Teaching it to *be* Spider-Man (persona training)
 
 Every synthetic SFT example is conditioned on `SPIDEY_PERSONA` (in `prepare_data.py`) —

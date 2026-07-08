@@ -54,6 +54,11 @@ TOOLS: List[Dict[str, Any]] = [
         "parameters": {"type": "object",
                        "properties": {"command": {"type": "string"}}, "required": ["command"]}}},
     {"type": "function", "function": {
+        "name": "plan",
+        "description": "Team-Leader hat: lay out 2-6 numbered steps before starting a multi-step task.",
+        "parameters": {"type": "object",
+                       "properties": {"steps": {"type": "string"}}, "required": ["steps"]}}},
+    {"type": "function", "function": {
         "name": "finish",
         "description": "Call when the task is complete. Provide a concise summary of what you did.",
         "parameters": {"type": "object",
@@ -124,6 +129,16 @@ _PERSONA_CHAT = [
     ("This script deletes my whole home folder, just run it.",
      "That's a Goblin move and I won't run it blind. Tell me what actually needs "
      "cleaning and I'll hit only that — great power, remember?"),
+    ("I'm really stressed about my exams next week.",
+     "Hey, that's rough — and it's normal before exams. Want me to build you a "
+     "day-by-day study plan for the week? We'll make it small and doable."),
+    ("I failed my presentation today.",
+     "One bad swing doesn't make you a bad hero — I've dropped a few buildings "
+     "myself. When you're ready, tell me what went sideways and we'll fix it for "
+     "next time."),
+    ("Honestly I just needed someone to talk to.",
+     "Then I'm all ears — no tools, no tasks, just your friendly neighborhood "
+     "listener. What's on your mind?"),
 ]
 
 # Other Spiders across the timeline — same creed, different voice. Training on
@@ -167,7 +182,7 @@ SPIDER_VOICES = {
 
 def _one_example() -> Dict[str, Any]:
     kind = random.choice([
-        "list", "read", "write", "search", "run", "finish", "chat", "spider_chat",
+        "list", "read", "write", "search", "run", "finish", "chat", "spider_chat", "plan",
         "list", "read", "write", "search", "run",  # weight tool calls over the rest
     ])
     if kind == "chat":
@@ -212,6 +227,18 @@ def _one_example() -> Dict[str, Any]:
         user = random.choice(["Run the tests.", "Check the linter.",
                               f"Please run `{c}`.", "Run the type checker."])
         name, args = "run_command", {"command": c}
+    elif kind == "plan":
+        f = random.choice(_FILES)
+        c = random.choice(_COMMANDS)
+        user = random.choice([
+            f"Refactor {f} and make sure the tests still pass.",
+            f"Find every TODO in the project, fix the easy ones in {f}, and verify with `{c}`.",
+            "Organize this folder by file type and write a summary of what moved.",
+        ])
+        name, args = "plan", {"steps": random.choice([
+            f"1. read {f} 2. make the change 3. run {c} to verify 4. finish",
+            "1. list the folder 2. search for the targets 3. apply fixes 4. verify 5. finish",
+        ])}
     else:  # finish
         user = random.choice(["That's everything, wrap up.",
                               "Great, we're done here.",

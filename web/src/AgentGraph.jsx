@@ -14,6 +14,8 @@ const TOOL_STYLE = {
   task: { icon: '◎', color: '#818cf8', label: 'task' },
   think: { icon: '🧠', color: '#c084fc', label: 'think' },
   answer: { icon: '💬', color: '#60a5fa', label: 'answer' },
+  plan: { icon: '📋', color: '#f59e0b', label: 'plan' },
+  remember: { icon: '💾', color: '#a78bfa', label: 'remember' },
   read_file: { icon: '📖', color: '#38bdf8', label: 'read_file' },
   write_file: { icon: '✏️', color: '#34d399', label: 'write_file' },
   list_directory: { icon: '📂', color: '#2dd4bf', label: 'list_directory' },
@@ -37,7 +39,7 @@ function subtitle(step) {
   if (step.type === 'answer') return step.text
   if (step.type === 'finish') return step.text
   const a = step.args || {}
-  return a.path || a.pattern || a.command || ''
+  return a.path || a.pattern || a.command || a.steps || a.fact || ''
 }
 
 function StepNode({ data }) {
