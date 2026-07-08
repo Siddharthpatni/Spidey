@@ -1,0 +1,12 @@
+{
+  "name": "Spidey — your friendly neighborhood AI",
+  "short_name": "Spidey",
+  "description": "Offline AI assistant with a live reasoning web. Say 'Hey Spidey'.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0b0b10",
+  "theme_color": "#0b0b10",
+  "icons": [
+    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}

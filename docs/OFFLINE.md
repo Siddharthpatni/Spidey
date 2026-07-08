@@ -122,6 +122,14 @@ to know: microphones require a *secure context*, so the **mic button works on
 localhost but not on plain `http://<ip>`** — put TLS in front (a one-liner with
 [Caddy](https://caddyserver.com)) if you want voice from remote devices.
 
+**Use it like an app, not a browser tab:** the UI is installable. On the phone, open
+the URL once, then *Share → Add to Home Screen* (iOS) or *⋮ → Add to home screen*
+(Android) — Spidey launches fullscreen with its own icon, like a native app. The UI
+is fully responsive on phones (chat and the reasoning web become tabs). If the server
+asks for a token, the app shows an unlock screen — paste the token once and it's
+remembered. The true native app (Flutter, [app/](../app/)) covers
+iOS/Android/desktop with the same protocol.
+
 ## What needs internet, exactly
 
 | Action | Internet? |

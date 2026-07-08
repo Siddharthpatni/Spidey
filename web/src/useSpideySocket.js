@@ -32,6 +32,7 @@ export const initialState = {
   chat: [],
   steps: [],
   approval: null, // {id, prompt}
+  authDenied: false, // server requires a (different) access token
 }
 
 function patchLast(items, matches, patch) {
@@ -133,6 +134,7 @@ function applyEvent(state, ev) {
     case 'max_steps':
       return { ...state, chat: [...state.chat, { id: uid(), kind: 'error', text: 'Stopped: reached the step limit without finishing.' }] }
     case 'error':
+      if ((ev.message || '').startsWith('Access denied')) return { ...state, authDenied: true }
       return { ...state, chat: [...state.chat, { id: uid(), kind: 'error', text: ev.message }] }
     case 'run_done':
       return { ...state, status: 'idle', approval: null }

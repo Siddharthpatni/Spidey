@@ -58,8 +58,17 @@ const inputCls =
 
 export default function Settings({ config, onSave, onClose }) {
   const [cfg, setCfg] = useState(config)
+  const [token, setToken] = useState(() => localStorage.getItem('spidey-token') || '')
   const provider = PROVIDERS.find(p => p.id === cfg.provider) || PROVIDERS[0]
   const set = patch => setCfg(c => ({ ...c, ...patch }))
+
+  const save = () => {
+    const prevToken = localStorage.getItem('spidey-token') || ''
+    localStorage.setItem('spidey-token', token.trim())
+    onSave(cfg)
+    onClose()
+    if (token.trim() !== prevToken) location.reload() // reconnect sockets with the new token
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={onClose}>
@@ -139,6 +148,16 @@ export default function Settings({ config, onSave, onClose }) {
           />
         </Field>
 
+        <Field label="Server access token (only if the server runs with --token)">
+          <input
+            type="password"
+            value={token}
+            onChange={e => setToken(e.target.value)}
+            placeholder="leave empty for localhost"
+            className={inputCls}
+          />
+        </Field>
+
         <div className="grid grid-cols-2 gap-3">
           <Field label="Safety mode">
             <select value={cfg.safety} onChange={e => set({ safety: e.target.value })} className={inputCls}>
@@ -159,13 +178,7 @@ export default function Settings({ config, onSave, onClose }) {
           </Field>
         </div>
 
-        <button
-          onClick={() => {
-            onSave(cfg)
-            onClose()
-          }}
-          className="w-full rounded-lg spidey-btn-primary py-2 text-sm font-semibold"
-        >
+        <button onClick={save} className="w-full rounded-lg spidey-btn-primary py-2 text-sm font-semibold">
           Save
         </button>
       </div>

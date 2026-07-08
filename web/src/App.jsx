@@ -45,6 +45,38 @@ function Splash({ fading }) {
   )
 }
 
+function TokenGate() {
+  const [token, setToken] = useState('')
+  const unlock = () => {
+    if (!token.trim()) return
+    localStorage.setItem('spidey-token', token.trim())
+    location.reload()
+  }
+  return (
+    <div className="fixed inset-0 z-[95] flex items-center justify-center bg-black/80 p-4">
+      <div className="w-full max-w-sm rounded-2xl border border-[var(--spidey-red)]/40 bg-zinc-950 p-6 shadow-2xl">
+        <div className="mb-1 flex items-center gap-2 text-lg font-bold">🔐 Access token needed</div>
+        <p className="mb-4 text-sm text-zinc-400">
+          This Spidey server was started with <code className="text-zinc-300">--token</code>.
+          Paste the token from the terminal where <code className="text-zinc-300">spidey serve</code> is
+          running (it's printed in the URL after <code className="text-zinc-300">?token=</code>).
+        </p>
+        <input
+          autoFocus
+          value={token}
+          onChange={e => setToken(e.target.value)}
+          onKeyDown={e => e.key === 'Enter' && unlock()}
+          placeholder="access token"
+          className="mb-3 w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm outline-none focus:border-[var(--spidey-red)]"
+        />
+        <button onClick={unlock} className="spidey-btn-primary w-full rounded-lg py-2 text-sm font-semibold">
+          Unlock
+        </button>
+      </div>
+    </div>
+  )
+}
+
 function StepSheet({ step, onClose }) {
   const s = styleFor(step)
   return (
@@ -85,6 +117,7 @@ export default function App() {
   const [showHistory, setShowHistory] = useState(false)
   const [history, setHistory] = useState(loadHistory)
   const [selected, setSelected] = useState(null)
+  const [view, setView] = useState('chat') // mobile: chat | web
   const [splash, setSplash] = useState('show') // show -> fading -> gone
   const [showOnboarding, setShowOnboarding] = useState(
     () => localStorage.getItem('spidey-onboarded') !== '1',
@@ -203,47 +236,54 @@ export default function App() {
 
   return (
     <div className="flex h-screen flex-col">
-      <header className="spidey-header flex items-center gap-3 px-4 py-2.5">
+      <header className="spidey-header flex items-center gap-2 px-3 py-2.5 sm:gap-3 sm:px-4">
         <span className="text-lg">🕷️</span>
         <h1 className="text-sm font-bold tracking-wide">Spidey</h1>
-        <span className="text-xs text-zinc-600">your friendly neighborhood AI · runs on your machine</span>
-        <div className="ml-auto flex items-center gap-2">
+        <span className="hidden text-xs text-zinc-600 lg:inline">
+          your friendly neighborhood AI · runs on your machine
+        </span>
+        <div className="ml-auto flex items-center gap-1.5 sm:gap-2">
           {voice.status === 'listening' && <Badge tone="red">🎙 “hey spidey”</Badge>}
           {voice.status === 'awake' && <Badge tone="red">🎙 listening…</Badge>}
           {state.status === 'running' && <Badge tone="amber">running</Badge>}
           <Badge tone={state.connected ? 'green' : 'red'}>
             {state.connected ? '● connected' : '○ offline'}
           </Badge>
-          <Badge>{state.runMeta?.model || provider.name}</Badge>
-          <Badge>safety: {config.safety}</Badge>
+          <span className="hidden md:inline-flex gap-2">
+            <Badge>{state.runMeta?.model || provider.name}</Badge>
+            <Badge>safety: {config.safety}</Badge>
+          </span>
           {state.status !== 'running' && state.chat.length > 0 && (
             <button
               onClick={startNewChat}
-              className="rounded-lg border border-zinc-700 px-3 py-1 text-xs font-semibold text-zinc-300 hover:bg-zinc-800"
+              className="rounded-lg border border-zinc-700 px-2.5 py-1 text-xs font-semibold text-zinc-300 hover:bg-zinc-800"
             >
-              ＋ New
+              ＋<span className="hidden sm:inline"> New</span>
             </button>
           )}
           <button
             onClick={() => setShowHistory(h => !h)}
-            className="rounded-lg border border-zinc-700 px-3 py-1 text-xs font-semibold text-zinc-300 hover:bg-zinc-800"
+            className="rounded-lg border border-zinc-700 px-2.5 py-1 text-xs font-semibold text-zinc-300 hover:bg-zinc-800"
           >
-            🕘 History
+            🕘<span className="hidden sm:inline"> History</span>
           </button>
           <button
             onClick={() => setShowSettings(true)}
-            className="rounded-lg border border-zinc-700 px-3 py-1 text-xs font-semibold text-zinc-300 hover:bg-zinc-800"
+            className="rounded-lg border border-zinc-700 px-2.5 py-1 text-xs font-semibold text-zinc-300 hover:bg-zinc-800"
           >
-            ⚙ Settings
+            ⚙<span className="hidden sm:inline"> Settings</span>
           </button>
         </div>
       </header>
 
       <main className="relative flex min-h-0 flex-1">
-        <section className="w-[380px] shrink-0 border-r border-zinc-800">
+        {/* On phones the two panels become tabs; from md up they sit side by side. */}
+        <section
+          className={`${view === 'chat' ? 'flex' : 'hidden'} w-full flex-col md:flex md:w-[380px] md:shrink-0 md:border-r md:border-zinc-800`}
+        >
           <Chat state={state} voice={voice} onStart={start} onStop={stopRun} onAnswer={answerApproval} />
         </section>
-        <section className="relative min-w-0 flex-1">
+        <section className={`${view === 'web' ? 'block' : 'hidden'} relative min-w-0 flex-1 md:block`}>
           <AgentGraph steps={state.steps} onSelect={setSelected} />
           {selected && <StepSheet step={selected} onClose={() => setSelected(null)} />}
         </section>
@@ -257,9 +297,33 @@ export default function App() {
         )}
       </main>
 
+      <nav className="flex border-t border-zinc-800 md:hidden">
+        {[
+          { id: 'chat', label: '💬 Chat' },
+          { id: 'web', label: '🕸 Web' },
+        ].map(t => (
+          <button
+            key={t.id}
+            onClick={() => setView(t.id)}
+            className={`flex-1 py-2.5 text-sm font-semibold ${
+              view === t.id
+                ? 'border-t-2 border-[var(--spidey-red)] text-zinc-100'
+                : 'text-zinc-500'
+            }`}
+          >
+            {t.label}
+            {t.id === 'web' && state.status === 'running' && view !== 'web' && (
+              <span className="ml-1 animate-pulse text-[var(--spidey-red-bright)]">●</span>
+            )}
+          </button>
+        ))}
+      </nav>
+
       {showSettings && (
         <Settings config={config} onSave={handleSave} onClose={() => setShowSettings(false)} />
       )}
+
+      {state.authDenied && <TokenGate />}
 
       {splash === 'gone' && showOnboarding && (
         <Onboarding onSettings={onboardingSettings} onClose={dismissOnboarding} />
