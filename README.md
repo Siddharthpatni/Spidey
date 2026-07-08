@@ -67,16 +67,18 @@ OpenAI — key stays in your browser.
 
 Everyone who uses your Spidey instance sets their **own** model and key in the browser — the config lives in `localStorage`, is sent only over the socket for that run, and is never persisted server-side.
 
-**Which local model?** The Settings panel suggests these (all free, open-weight, and
-**fully offline** once pulled — the weights live on your disk, nothing phones home):
+**Which local model? Choose your Spider.** 🕸 The Settings panel is a visual
+**Spider-Verse picker** — every offline brain is a Spider from across the timeline
+(all free, open-weight, and **fully offline** once pulled):
 
-| Tag | Size | Why |
-|---|---|---|
-| `gemma4:12b` | ~7.6 GB | **the default.** Google's [Gemma 4](https://deepmind.google/models/gemma/gemma-4/) (Apache 2.0, Apr 2026) — built for agentic workflows with *native function-calling*, 256K context |
-| `gemma4:e4b` / `gemma4:e2b` | ~9.6 / ~7.2 GB | Gemma 4 edge variants (4.5B / 2.3B effective) for lighter machines |
-| `qwen2.5-coder:7b` | ~4.7 GB | strong coding-focused tool-caller |
-| `llama3.1:8b` | ~4.9 GB | strong general assistant |
-| `qwen2.5-coder:1.5b` | ~1 GB | tiny; old laptops and experiments |
+| Spider | Timeline | Tag | Size | Why |
+|---|---|---|---|---|
+| 🕷️ **Peter Parker** | The Amazing Spider-Man | `gemma4:12b` | ~7.6 GB | **the default.** [Gemma 4](https://deepmind.google/models/gemma/gemma-4/) (Apache 2.0) — native function-calling, the smartest web on your machine |
+| ⚡ **Miles Morales** | Ultimate Spider-Man | `qwen2.5-coder:7b` | ~4.7 GB | young, fast, street-smart — the quickest swing on 16 GB machines |
+| 🩰 **Spider-Gwen** | Ghost-Spider | `gemma4:e4b` | ~9.6 GB | light on her feet — Gemma 4 edge (4.5B effective) for lighter hardware |
+| 🕵️ **Spider-Man Noir** | The Noir timeline | `llama3.1:8b` | ~4.9 GB | old-school detective — a seasoned general assistant |
+| 🔮 **Miguel O'Hara** | Spider-Man 2099 | `gemma4:26b` | ~18 GB | the future — Gemma 4 MoE for 32 GB+ rigs |
+| 🐷 **Peter Porker** | Spider-Ham | `qwen2.5-coder:1.5b` | ~1 GB | the cartoon timeline — tiny, silly, old laptops welcome |
 
 *Is Gemma "fully offline"? The Gemma models are — they're open-weight downloads (unlike
 Gemini, which is a cloud API). `spidey setup` pulls the weights once; after that the

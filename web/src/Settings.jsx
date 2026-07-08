@@ -8,15 +8,49 @@ export const PROVIDERS = [
   { id: 'custom', name: 'Custom (OpenAI-compatible URL)', model: '', needsKey: false },
 ]
 
-// Open-weight brains that actually hold up as agents. All run fully offline
-// via `ollama pull <tag>` — see README "Pick your brain".
-export const OLLAMA_MODELS = [
-  { tag: 'gemma4:12b', note: 'Gemma 4 — native tool-calling, best agent · ~7.6 GB' },
-  { tag: 'gemma4:e4b', note: 'Gemma 4 edge — lighter machines · ~9.6 GB' },
-  { tag: 'qwen2.5-coder:7b', note: 'strong coding tool-caller · ~4.7 GB' },
-  { tag: 'llama3.1:8b', note: 'strong general assistant · ~4.9 GB' },
-  { tag: 'qwen2.5-coder:1.5b', note: 'tiny — old laptops & experiments · ~1 GB' },
+// The Spider-Verse: every offline brain is a Spider from across the timeline.
+// All free, all open-weight, all fully offline via `ollama pull <tag>`.
+export const SPIDER_VERSE = [
+  {
+    tag: 'gemma4:12b', spider: 'Peter Parker', emoji: '🕷️',
+    title: 'The Amazing Spider-Man', size: '7.6 GB',
+    note: 'The definitive Spidey. Gemma 4 — native tool-calling, the smartest web on your machine.',
+    colors: ['#c81e24', '#2545a8'],
+  },
+  {
+    tag: 'qwen2.5-coder:7b', spider: 'Miles Morales', emoji: '⚡',
+    title: 'Ultimate Spider-Man', size: '4.7 GB',
+    note: 'Young, fast, street-smart. The quickest swing on 16 GB machines — great with code.',
+    colors: ['#111111', '#c81e24'],
+  },
+  {
+    tag: 'gemma4:e4b', spider: 'Spider-Gwen', emoji: '🩰',
+    title: 'Ghost-Spider', size: '9.6 GB',
+    note: 'Light on her feet. Gemma 4 edge (4.5B effective) — graceful on lighter hardware.',
+    colors: ['#f8fafc', '#e11d8f'],
+  },
+  {
+    tag: 'llama3.1:8b', spider: 'Spider-Man Noir', emoji: '🕵️',
+    title: 'The Noir Timeline', size: '4.9 GB',
+    note: 'Old-school detective. Llama 3.1 — a solid, seasoned general assistant.',
+    colors: ['#3f3f46', '#a1a1aa'],
+  },
+  {
+    tag: 'gemma4:26b', spider: 'Miguel O’Hara', emoji: '🔮',
+    title: 'Spider-Man 2099', size: '18 GB',
+    note: 'The future. Gemma 4 26B MoE — for 32 GB+ rigs that want frontier-feel offline.',
+    colors: ['#1e3a8a', '#dc2626'],
+  },
+  {
+    tag: 'qwen2.5-coder:1.5b', spider: 'Peter Porker', emoji: '🐷',
+    title: 'Spider-Ham', size: '1 GB',
+    note: 'The cartoon timeline. Tiny, silly, surprisingly capable — old laptops welcome.',
+    colors: ['#f472b6', '#fbbf24'],
+  },
 ]
+
+// Back-compat: plain tag list (datalist for the free-text input).
+export const OLLAMA_MODELS = SPIDER_VERSE.map(s => ({ tag: s.tag, note: `${s.spider} · ${s.size}` }))
 
 export const defaultConfig = {
   provider: 'ollama',
@@ -50,6 +84,56 @@ function Field({ label, children }) {
       <span className="mb-1 block text-xs font-medium text-zinc-400">{label}</span>
       {children}
     </label>
+  )
+}
+
+// "Choose your Spider" — the offline models as characters across the
+// Spider-Verse timeline. Clicking a card picks that brain.
+function SpiderVersePicker({ value, onPick }) {
+  return (
+    <div>
+      <div className="mb-1.5 text-xs font-medium text-zinc-400">
+        Choose your Spider <span className="text-zinc-600">— every one runs 100% offline</span>
+      </div>
+      <div className="grid max-h-64 grid-cols-2 gap-2 overflow-y-auto pr-1">
+        {SPIDER_VERSE.map(s => {
+          const active = value === s.tag
+          return (
+            <button
+              key={s.tag}
+              type="button"
+              onClick={() => onPick(s.tag)}
+              className={`rounded-xl border p-2.5 text-left transition-all ${
+                active
+                  ? 'border-transparent shadow-lg'
+                  : 'border-zinc-700 hover:border-zinc-500'
+              }`}
+              style={{
+                background: active
+                  ? `linear-gradient(135deg, ${s.colors[0]}33, ${s.colors[1]}33)`
+                  : undefined,
+                boxShadow: active ? `0 0 0 1.5px ${s.colors[0]}, 0 0 18px ${s.colors[0]}55` : undefined,
+              }}
+            >
+              <div className="flex items-center gap-2">
+                <span
+                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-base"
+                  style={{ background: `linear-gradient(135deg, ${s.colors[0]}, ${s.colors[1]})` }}
+                >
+                  {s.emoji}
+                </span>
+                <div className="min-w-0">
+                  <div className="truncate text-xs font-bold text-zinc-100">{s.spider}</div>
+                  <div className="truncate text-[10px] text-zinc-500">{s.title} · {s.size}</div>
+                </div>
+                {active && <span className="ml-auto text-emerald-400">✓</span>}
+              </div>
+              <p className="mt-1.5 line-clamp-2 text-[10px] leading-snug text-zinc-400">{s.note}</p>
+            </button>
+          )
+        })}
+      </div>
+    </div>
   )
 }
 
@@ -93,6 +177,13 @@ export default function Settings({ config, onSave, onClose }) {
           </select>
         </Field>
 
+        {cfg.provider === 'ollama' && (
+          <SpiderVersePicker
+            value={cfg.model || provider.model}
+            onPick={tag => set({ model: tag })}
+          />
+        )}
+
         <Field label={`Model ${provider.model ? `(default: ${provider.model})` : ''}`}>
           <input
             value={cfg.model}
@@ -109,7 +200,7 @@ export default function Settings({ config, onSave, onClose }) {
                 ))}
               </datalist>
               <p className="mt-1 text-[11px] text-zinc-500">
-                Runs 100% on your machine. Get one with <code className="text-zinc-400">spidey setup</code>{' '}
+                Get your Spider with <code className="text-zinc-400">spidey setup --model &lt;tag&gt;</code>{' '}
                 or <code className="text-zinc-400">ollama pull &lt;tag&gt;</code>.
               </p>
             </>
