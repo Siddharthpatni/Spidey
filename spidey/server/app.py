@@ -64,6 +64,9 @@ class Session:
         self.pending_approvals: Dict[str, concurrent.futures.Future] = {}
         self.cancelled = False
         self.running = False
+        # Conversation memory for this socket: past (task, answer) turns, so
+        # follow-ups build on each other like a real conversation.
+        self.history: list[Dict[str, Any]] = []
 
     # -- called from the agent's worker thread ------------------------------ #
     def _push(self, payload: Dict[str, Any]) -> None:
@@ -103,7 +106,12 @@ class Session:
                 approve=self.approve,
                 on_event=self.on_event,
             )
-            agent.run(task)
+            result = agent.run(task, history=self.history[-12:])
+            answer = (result.get("answer") or "").strip()
+            if answer and not answer.startswith("(stopped:"):
+                self.history += [{"role": "user", "content": task},
+                                 {"role": "assistant", "content": answer}]
+                del self.history[:-24]
         except RunCancelled:
             self._push({"type": "error", "step": 0, "message": "Run stopped by user."})
         except Exception as e:  # config/backend errors -> surface, don't kill the socket
@@ -193,6 +201,8 @@ def create_app(default_workdir: str = ".", token: Optional[str] = None) -> FastA
                         fut.set_result(bool(msg.get("approved")))
                 elif mtype == "stop":
                     session.cancel()
+                elif mtype == "new_chat":
+                    session.history.clear()
         except WebSocketDisconnect:
             pass
         finally:
@@ -251,18 +261,27 @@ def create_app(default_workdir: str = ".", token: Optional[str] = None) -> FastA
     return app
 
 
-def _lan_ip() -> Optional[str]:
-    """This machine's LAN address — what other devices actually dial."""
+def _lan_ips() -> list[str]:
+    """Every LAN address of this machine — multi-homed Macs have several."""
     import socket
 
+    ips = set()
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     try:
         s.connect(("10.255.255.255", 1))  # no packets sent; just picks the route
-        return s.getsockname()[0]
+        ips.add(s.getsockname()[0])
     except OSError:
-        return None
+        pass
     finally:
         s.close()
+    try:
+        for info in socket.getaddrinfo(socket.gethostname(), None, socket.AF_INET):
+            ip = info[4][0]
+            if not ip.startswith("127."):
+                ips.add(ip)
+    except OSError:
+        pass
+    return sorted(ips)
 
 
 def _port_in_use(port: int) -> bool:
@@ -272,8 +291,33 @@ def _port_in_use(port: int) -> bool:
         return s.connect_ex(("127.0.0.1", port)) == 0
 
 
+def _ensure_cert(lan_ips: list[str]) -> tuple[str, str]:
+    """Self-signed TLS cert in ~/.spidey/certs — created once, regenerated when
+    the machine's addresses change. HTTPS is what lets phone browsers open the mic."""
+    import subprocess
+
+    cert_dir = Path.home() / ".spidey" / "certs"
+    cert_dir.mkdir(parents=True, exist_ok=True)
+    cert, key = cert_dir / "cert.pem", cert_dir / "key.pem"
+
+    if cert.exists() and key.exists():
+        txt = subprocess.run(["openssl", "x509", "-in", str(cert), "-noout", "-text"],
+                             capture_output=True, text=True).stdout
+        if all(f"IP Address:{ip}" in txt for ip in lan_ips):
+            return str(cert), str(key)
+
+    san = ",".join(["DNS:localhost", "IP:127.0.0.1", *(f"IP:{ip}" for ip in lan_ips)])
+    subprocess.run(
+        ["openssl", "req", "-x509", "-newkey", "rsa:2048", "-sha256", "-days", "3650",
+         "-nodes", "-keyout", str(key), "-out", str(cert),
+         "-subj", "/CN=Spidey", "-addext", f"subjectAltName={san}"],
+        check=True, capture_output=True,
+    )
+    return str(cert), str(key)
+
+
 def serve(host: str = "127.0.0.1", port: int = 8000, workdir: str = ".",
-          token: Optional[str] = None) -> int:
+          token: Optional[str] = None, https: bool = False) -> int:
     import uvicorn
 
     if _port_in_use(port):
@@ -284,16 +328,27 @@ def serve(host: str = "127.0.0.1", port: int = 8000, workdir: str = ".",
 
     token = token or os.environ.get("SPIDEY_TOKEN") or None
     app = create_app(default_workdir=workdir, token=token)
+    lan = _lan_ips() if host not in ("127.0.0.1", "localhost") else []
+    ssl_kwargs: Dict[str, Any] = {}
+    if https:
+        certfile, keyfile = _ensure_cert(lan)
+        ssl_kwargs = {"ssl_certfile": certfile, "ssl_keyfile": keyfile}
+
+    scheme = "https" if https else "http"
     q = f"/?token={token}" if token else "/"
     print(f"● Spidey is up   (agent workdir: {Path(workdir).resolve()})")
-    print(f"  this machine → http://127.0.0.1:{port}{q}")
+    print(f"  this machine → {scheme}://127.0.0.1:{port}{q}")
+    for ip in lan:
+        print(f"  same Wi-Fi   → {scheme}://{ip}:{port}{q}")
     if host not in ("127.0.0.1", "localhost"):
-        lan = _lan_ip()
-        if lan:
-            print(f"  same Wi-Fi   → http://{lan}:{port}{q}")
         if not token:
             print("  ⚠ auth: NONE and the server is reachable from the network. "
                   "Restart with --token (or $SPIDEY_TOKEN).")
-        print("  (voice note: browsers allow the mic on localhost only unless you add HTTPS)")
-    uvicorn.run(app, host=host, port=port, log_level="warning")
+        if https:
+            print("  cert is self-signed: the browser warns once — proceed, and the "
+                  "mic + voice work from any device.")
+        else:
+            print("  (voice note: phone browsers only open the mic over HTTPS — "
+                  "restart with --https to talk to Spidey from other devices)")
+    uvicorn.run(app, host=host, port=port, log_level="warning", **ssl_kwargs)
     return 0

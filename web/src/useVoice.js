@@ -217,6 +217,8 @@ export function useVoice({ onUtterance }) {
   return {
     available: !!serverStatus?.available,
     hint: serverStatus?.hint,
+    // Browsers expose the mic only in secure contexts (https or localhost).
+    micSupported: !!navigator.mediaDevices?.getUserMedia,
     status: serverStatus && !serverStatus.available ? 'unavailable' : status,
     partial,
     toggle,

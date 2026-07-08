@@ -94,6 +94,9 @@ def main(argv: Optional[list] = None) -> int:
     s.add_argument("--token", default=None,
                    help="Require this access token on every connection (also $SPIDEY_TOKEN). "
                         "Mandatory before exposing Spidey beyond localhost.")
+    s.add_argument("--https", action="store_true",
+                   help="Serve over HTTPS with an auto-generated self-signed certificate. "
+                        "Needed for the mic/voice to work from phones and other devices.")
     p = sub.add_parser("setup", help="Download an open-weight model so Spidey runs fully offline.")
     p.add_argument("--model", default="gemma4:12b",
                    help="Ollama model tag to download. Default: gemma4:12b (~7.6 GB).")
@@ -126,7 +129,8 @@ def main(argv: Optional[list] = None) -> int:
                 "The web UI needs the server extras. Install with:\n"
                 '    pip install -e ".[server]"'
             )
-        return serve(host=args.host, port=args.port, workdir=args.workdir, token=args.token)
+        return serve(host=args.host, port=args.port, workdir=args.workdir,
+                     token=args.token, https=args.https)
 
     if args.cmd == "run":
         task = args.task

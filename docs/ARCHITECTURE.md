@@ -10,8 +10,7 @@ offline voice, the safety layer, and the training pipeline. Companion references
 ```mermaid
 flowchart TD
     subgraph Clients
-        W["Web UI (React + React Flow)<br/>chat · live reasoning web · approvals · voice"]
-        F["Flutter app (app/)<br/>iOS · Android · macOS · Windows · Linux"]
+        W["Web UI (React + React Flow)<br/>chat · live reasoning web · approvals · voice<br/>installable on phones (PWA)"]
     end
 
     subgraph Server["spidey serve — FastAPI, one process on YOUR machine"]
@@ -29,7 +28,6 @@ flowchart TD
     end
 
     W <-->|JSON events| WS
-    F <-->|JSON events| WS
     W <-->|16 kHz PCM ↔ events| WV
     WV --- VE
     WS --- AG

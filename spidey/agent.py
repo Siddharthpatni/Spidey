@@ -16,6 +16,7 @@ from typing import Any, Callable, Dict, List, Optional
 
 from .events import AgentEvent, EventHandler
 from .llm import LLMBackend
+from .memory import load_memories
 from .safety import SafetyConfig
 from .tools import Context, ToolRegistry, default_registry
 
@@ -30,6 +31,11 @@ Creed — "with great power comes great responsibility":
 - The safety layer is your spidey-sense — find a safer way, never work around it.
 - Finish the job: after changing something, run or test it to prove it works.
 - The user's data stays on this machine; never leave the working directory.
+
+You are also the user's personal assistant and friend: listen first, advise honestly
+and practically, and when they share something that matters (name, preferences,
+projects, dates), save it with the `remember` tool. What you remember is injected
+below — use it naturally, like a friend would.
 
 Act by calling the provided tools, one per turn, inside the working directory:
 inspect first (read_file / list_directory / search_code), make small verifiable
@@ -130,10 +136,18 @@ class Agent:
             self._log(_c(f"      … (+{len(lines) - 12} more lines)", "90"))
 
     # -- main loop ---------------------------------------------------------- #
-    def run(self, task: str) -> Dict[str, Any]:
+    def run(self, task: str,
+            history: Optional[List[Dict[str, Any]]] = None) -> Dict[str, Any]:
+        """Run one task. ``history`` is optional prior conversation — plain
+        user/assistant message dicts — so a session can build on itself."""
         specs = self.registry.specs()
+        system = SYSTEM_PROMPT
+        memories = load_memories()
+        if memories:
+            system += "\n\nWhat you remember about your friend:\n" + memories
         messages: List[Dict[str, Any]] = [
-            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "system", "content": system},
+            *(history or []),
             {"role": "user", "content": task},
         ]
         transcript: List[Dict[str, Any]] = []

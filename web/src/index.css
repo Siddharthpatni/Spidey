@@ -15,6 +15,16 @@ body {
   font-family: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
 }
 
+/* iOS auto-zooms the page when a focused input's font is under 16px, then
+   leaves it zoomed out after send. Keep form fields at 16px on phones. */
+@media (max-width: 767px) {
+  textarea,
+  input,
+  select {
+    font-size: 16px !important;
+  }
+}
+
 /* Faint spider web anchored in the chat panel's corner. */
 .spidey-web-bg {
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='260' height='260'%3E%3Cg stroke='%238892b0' stroke-opacity='0.13' fill='none'%3E%3Cpath d='M0 0L260 0M0 0L260 65M0 0L260 156M0 0L195 260M0 0L104 260M0 0L0 260'/%3E%3Cpath d='M52 0Q48 24 0 39M113 0Q102 54 0 87M182 0Q163 87 0 143M252 8Q224 121 10 215'/%3E%3C/g%3E%3C/svg%3E");

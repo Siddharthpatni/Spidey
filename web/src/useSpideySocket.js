@@ -187,6 +187,7 @@ export function useSpideySocket() {
   }, [])
 
   const newChat = useCallback(() => {
+    wsRef.current?.send(JSON.stringify({ type: 'new_chat' })) // clear server-side memory of this session
     dispatch({ type: 'new_chat' })
   }, [])
 

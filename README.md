@@ -21,7 +21,12 @@ Spidey is an autonomous AI assistant that lives on **your** machine: give it a t
 
 <!-- 🎬 DROP THE DEMO GIF HERE — record `spidey serve` running a real task with a screen recorder -->
 
-Four things make it different:
+Five things make it different:
+
+0. **It knows you.** A local long-term memory (`~/.spidey/memory.md` — a plain
+   markdown file *you* own and can edit) plus in-conversation continuity: tell it
+   your name once and it greets you by it next week, fully offline. The `remember`
+   tool saves what a good friend would remember.
 
 1. **The graphical brain.** `spidey serve` opens a chat + live agent-graph UI (React + React Flow over FastAPI WebSockets). Every step streams in as an animated node — including the safety layer's **Approve / Deny** prompt when the agent wants to run something risky.
 2. **"Hey Spidey" — voice, fully on-device.** Turn on the mic and just talk: an offline wake word + speech-to-text (Vosk, running on *your* machine) hears the task, and replies are spoken with your OS's local voices. No audio ever leaves the device.
@@ -201,18 +206,17 @@ Spidey/
 │   └── server/        #   FastAPI + WebSocket bridge (+ built UI in static/)
 │   ├── voice.py       #   offline wake word + speech-to-text (Vosk, on-device)
 ├── web/               # React + Vite + Tailwind + React Flow frontend (chat · graph · voice)
-├── app/               # Flutter client: iOS · Android · macOS · Windows · Linux
 ├── training/          # stage 1 SFT + stage 2 DPO → GGUF → Ollama (free GPU)
 └── eval/              # tool-selection accuracy: base vs SFT vs DPO
 ```
 
-## 📱 On your phone and every desktop
+## 📱 On your phone — no app store needed
 
-[`app/`](app/) is a **Flutter** client — same chat, same approvals, tap-to-talk voice —
-that builds for **iOS, Android, macOS, Windows and Linux** and speaks the identical
-WebSocket protocol as the web UI. Point it at `spidey serve` on the same machine
-(desktop, fully offline) or at your PC over Wi-Fi (phone, nothing leaves your network).
-Build steps and the honest per-platform offline matrix are in [app/README.md](app/README.md).
+The web UI **is** the app: fully responsive on phones (chat and the reasoning web
+become tabs) and installable — open your server's URL once, *Add to Home Screen*,
+and Spidey launches fullscreen with its own icon. For voice from the phone, start
+the server with `--https` (one flag; the mic needs a secure page). Details in
+[docs/OFFLINE.md](docs/OFFLINE.md).
 
 ## 📚 Documentation
 
@@ -223,7 +227,6 @@ Build steps and the honest per-platform offline matrix are in [app/README.md](ap
 | [docs/SECURITY.md](docs/SECURITY.md) | threat model, safety layer, token auth, privacy table, deployment guidance |
 | [docs/OFFLINE.md](docs/OFFLINE.md) | the offline story: models, RAM needs, exactly what touches the internet |
 | [training/README.md](training/README.md) | SFT → DPO math, persona training, base models, Colab recipes |
-| [app/README.md](app/README.md) | Flutter client: per-platform builds + offline matrix |
 
 ## Deploying it (optional)
 
@@ -238,7 +241,6 @@ To put it on a small cloud box (Railway, Render, Fly.io) for yourself, use the i
 
 ## Roadmap
 
-- [ ] "Hey Spidey" wake word in the Flutter app (mobile is tap-to-talk today)
 - [ ] Multi-file planning step for larger tasks
 - [ ] More tools (apply-patch/diff editing, container sandbox for `run_command`)
 - [ ] Persistent memory across sessions

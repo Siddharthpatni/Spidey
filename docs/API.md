@@ -1,7 +1,7 @@
 # 🕷️ Spidey wire protocol
 
-Everything a client needs to talk to `spidey serve`. The web UI and the Flutter app
-are both plain consumers of this — you can build your own client in an afternoon.
+Everything a client needs to talk to `spidey serve`. The web UI is a plain consumer
+of this — you can build your own client in an afternoon.
 
 ## Authentication
 

@@ -8,6 +8,38 @@ export function MicButton({ voice }) {
   const [showHint, setShowHint] = useState(false)
   const { status } = voice
 
+  // Secure-context wall: the browser hides the mic on plain http:// pages
+  // (localhost excepted). Tapping the mic explains the one-flag fix.
+  if (status !== 'unavailable' && !voice.micSupported) {
+    return (
+      <div className="relative">
+        <button
+          onClick={() => setShowHint(s => !s)}
+          title="Mic needs HTTPS on this device"
+          className="rounded-lg border border-zinc-700 px-3 py-2 text-sm text-zinc-500 hover:bg-zinc-800"
+        >
+          🎙
+        </button>
+        {showHint && (
+          <div className="absolute bottom-12 right-0 z-50 w-72 rounded-xl border border-[var(--spidey-blue)] bg-zinc-900 p-3 text-xs shadow-2xl">
+            <div className="mb-1 font-semibold text-zinc-200">Mic needs HTTPS here</div>
+            <p className="mb-2 text-zinc-400">
+              Browsers only open the microphone on secure pages. Restart the server with:
+            </p>
+            <pre className="overflow-x-auto rounded-lg bg-zinc-950 p-2 text-[11px] leading-relaxed text-zinc-300">
+{`spidey serve --host 0.0.0.0 \\
+  --token <token> --https`}
+            </pre>
+            <p className="mt-2 text-zinc-500">
+              Then open the https:// link, accept the one-time certificate warning, and
+              “Hey Spidey” works from this device too.
+            </p>
+          </div>
+        )}
+      </div>
+    )
+  }
+
   if (status === 'unavailable') {
     return (
       <div className="relative">

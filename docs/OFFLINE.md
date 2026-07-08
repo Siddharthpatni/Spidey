@@ -63,11 +63,9 @@ button in the UI shows the two setup commands.
 ## The screens: web, desktop, mobile
 
 - **Web UI** (`spidey serve`) — chat + live reasoning graph + voice. This is the
-  full experience.
-- **Flutter app** ([`app/`](../app/)) — iOS · Android · macOS · Windows · Linux.
-  Same protocol, tap-to-talk voice using the OS speech engine. On a PC it points at
-  `localhost` (fully offline); on a phone it points at your PC over Wi-Fi (nothing
-  leaves your network). Per-platform build steps: [app/README.md](../app/README.md).
+  full experience, and it's the app too: responsive on phones and installable via
+  *Add to Home Screen* (fullscreen, own icon). Voice from other devices needs the
+  server started with `--https`.
 
 ## The training loop: make the small brain smarter
 
@@ -127,8 +125,7 @@ the URL once, then *Share → Add to Home Screen* (iOS) or *⋮ → Add to home 
 (Android) — Spidey launches fullscreen with its own icon, like a native app. The UI
 is fully responsive on phones (chat and the reasoning web become tabs). If the server
 asks for a token, the app shows an unlock screen — paste the token once and it's
-remembered. The true native app (Flutter, [app/](../app/)) covers
-iOS/Android/desktop with the same protocol.
+remembered.
 
 ## What needs internet, exactly
 

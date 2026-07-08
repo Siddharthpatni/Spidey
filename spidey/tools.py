@@ -161,6 +161,11 @@ def _run_command(ctx: Context, args: Dict[str, Any]) -> str:
     return f"exit_code={proc.returncode}\n{body}".strip()
 
 
+def _remember(ctx: Context, args: Dict[str, Any]) -> str:
+    from .memory import add_memory
+    return add_memory(args["fact"])
+
+
 def _finish(ctx: Context, args: Dict[str, Any]) -> str:
     # The agent intercepts calls to `finish` by name; this is only a fallback.
     return args.get("summary", "")
@@ -209,6 +214,18 @@ def default_registry() -> ToolRegistry:
          "properties": {"command": {"type": "string"}},
          "required": ["command"]},
         _run_command,
+    ))
+    reg.register(Tool(
+        "remember",
+        "Save a lasting fact about the user — their name, preferences, projects, goals, "
+        "important dates. Use it whenever they share something a good friend would remember. "
+        "One short sentence per fact.",
+        {"type": "object",
+         "properties": {"fact": {"type": "string",
+                                 "description": "The fact, phrased to be useful later, e.g. "
+                                                "'Siddharth prefers short answers.'"}},
+         "required": ["fact"]},
+        _remember,
     ))
     reg.register(Tool(
         "finish",

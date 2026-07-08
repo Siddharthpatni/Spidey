@@ -21,7 +21,7 @@ Everything you need to publish Spidey and get eyes on it. This file is for *you*
 > Your friendly neighborhood AI — a fully offline voice assistant + agent. Say "Hey Spidey", watch it think in a live reasoning web, run it on Gemma 4 via Ollama (or your own Claude/Gemini/GPT key), and train its brain with SFT→DPO.
 
 **Topics / tags:**
-`ai-agent` · `voice-assistant` · `offline-first` · `llm` · `react` · `fastapi` · `websockets` · `ollama` · `gemma` · `vosk` · `dpo` · `qlora` · `fine-tuning` · `tool-calling` · `local-llm` · `autonomous-agents` · `flutter`
+`ai-agent` · `voice-assistant` · `offline-first` · `llm` · `react` · `fastapi` · `websockets` · `ollama` · `gemma` · `vosk` · `dpo` · `qlora` · `fine-tuning` · `tool-calling` · `local-llm` · `autonomous-agents`
 
 ---
 
@@ -45,7 +45,6 @@ Everything you need to publish Spidey and get eyes on it. This file is for *you*
 >
 > 🛡 **Safety outside the model.** Command screening, path confinement and token auth live in code the model can't talk its way past.
 >
-> 📱 One protocol, every screen: web UI plus a Flutter client for iOS / Android / macOS / Windows / Linux.
 >
 > Fully open source (MIT). Three commands to run it:
 > git clone → spidey setup → spidey serve
@@ -54,7 +53,7 @@ Everything you need to publish Spidey and get eyes on it. This file is for *you*
 >
 > I'd genuinely love feedback from anyone building agents, running local LLMs, or doing preference training — and if you try the voice mode, tell me what it misheard 🙂
 >
-> #AI #LLM #OpenSource #OfflineAI #VoiceAssistant #AIAgents #Ollama #Gemma #MachineLearning #Python #React #Flutter
+> #AI #LLM #OpenSource #OfflineAI #VoiceAssistant #AIAgents #Ollama #Gemma #MachineLearning #Python #React
 
 **Tips for the post:**
 - Lead with the screen recording of the reasoning web — native media gets ~5× the reach of a bare link.
