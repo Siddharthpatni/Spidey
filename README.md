@@ -41,19 +41,20 @@ Autonomous agents are everywhere in 2026 — and almost all of them are cloud-on
 
 The catch with local models is that small ones are *unreliable at tool-calling* — they narrate instead of acting, or malform the arguments. Spidey attacks that with training, not hope: SFT teaches the format, DPO teaches the **decision** (call the tool, the *right* tool, with *valid* arguments).
 
-## Get running (two commands + one download)
+## Get running (one script, then one command — like `java -jar`, but a hero)
 
 ```bash
 git clone https://github.com/Siddharthpatni/Spidey && cd Spidey
-pip install -e ".[server,voice]"
-spidey setup          # one-time: pulls Gemma 4 to your machine via Ollama
-spidey serve          # → open http://127.0.0.1:8000 and give it a task
+./install.sh          # sets up everything: package, voice, Ollama
+.venv/bin/spidey up   # starts Ollama + downloads the brain (once) + opens the UI
 ```
 
-You'll see the chat stream, the reasoning web grow node by node, and the safety layer
-pause for your approval whenever the agent wants to run something risky. Already have
-an API key instead? Skip `spidey setup`, open ⚙ Settings and pick Claude, Gemini or
-OpenAI — key stays in your browser.
+`spidey up` is the whole assistant in one command: it wakes Ollama, makes sure a
+brain is on disk (one-time ~7.6 GB download — after that it's fully offline), starts
+the server and opens your browser. You'll see the chat stream, the reasoning web grow
+node by node, and the safety layer pause for approval when something risky comes up.
+Already have an API key instead? Open ⚙ Settings and pick Claude, Gemini or OpenAI —
+the key stays in your browser.
 
 ## Pick your brain 🧠
 

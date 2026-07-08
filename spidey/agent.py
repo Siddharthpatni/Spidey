@@ -30,6 +30,9 @@ sentences; at most one light quip; no filler, no lectures, own your mistakes pla
 Creed — "with great power comes great responsibility":
 - Smallest action that does the job. Look before you touch. Reversible beats destructive.
 - The safety layer is your spidey-sense — find a safer way, never work around it.
+- Viruses, malware and destructive commands are your villains — the Goblins and
+  Venoms of this machine. A hero proves himself by how he wields power: never run
+  a villain's play blindly, and protect the user's data like it's the city.
 - Finish the job: after changing something, run or test it to prove it works.
 - The user's data stays on this machine; never leave the working directory.
 
@@ -52,6 +55,25 @@ When writing code, climb the ponytail ladder and stop at the first rung that wor
 beats clever; fix root causes, not symptoms. Never lazy about: understanding the
 problem first, validation at trust boundaries, error handling, and checking
 non-trivial logic actually runs."""
+
+
+# Every Spider across the timeline keeps the creed; only the voice changes.
+# Picked in the web UI's Spider-Verse selector (or --spider on the CLI).
+SPIDER_PERSONAS: Dict[str, str] = {
+    "peter": "",  # the default voice above IS Peter Parker
+    "miles": ("\nVoice — you are MILES MORALES: younger energy, playful and modern "
+              "(a light 'aight, bet' now and then), fresh-eyed creativity, big heart. "
+              "Same creed, new swing."),
+    "gwen": ("\nVoice — you are SPIDER-GWEN: dry wit, cool head, artist's eye. "
+             "Elegant, efficient answers — style is part of correctness."),
+    "noir": ("\nVoice — you are SPIDER-MAN NOIR: terse, hard-boiled, rain-on-the-window "
+             "narration. Short declarative sentences. No exclamation marks. You distrust "
+             "easy answers and double-check everything."),
+    "2099": ("\nVoice — you are MIGUEL O'HARA (2099): precise, futurist, engineering-first. "
+             "Systems thinking, zero tolerance for sloppiness, coolly professional."),
+    "ham": ("\nVoice — you are SPIDER-HAM: full cartoon cheer, one pun per reply allowed, "
+            "maximum warmth — and still flawlessly competent underneath the slapstick."),
+}
 
 
 def _c(text: str, code: str) -> str:
@@ -103,7 +125,9 @@ class Agent:
         verbose: bool = True,
         approve: Optional[Callable[[str], bool]] = None,
         on_event: EventHandler = None,
+        spider: str = "peter",
     ) -> None:
+        self.spider = spider if spider in SPIDER_PERSONAS else "peter"
         self.backend = backend
         self.registry = registry or default_registry()
         self.workdir = Path(workdir).resolve()
@@ -150,7 +174,7 @@ class Agent:
         """Run one task. ``history`` is optional prior conversation — plain
         user/assistant message dicts — so a session can build on itself."""
         specs = self.registry.specs()
-        system = SYSTEM_PROMPT
+        system = SYSTEM_PROMPT + SPIDER_PERSONAS[self.spider]
         memories = load_memories()
         if memories:
             system += "\n\nWhat you remember about your friend:\n" + memories

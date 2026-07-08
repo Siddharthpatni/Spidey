@@ -38,10 +38,72 @@ def _add_run_parser(sub: argparse._SubParsersAction) -> None:
     r.add_argument("--max-steps", type=int, default=25)
     r.add_argument("--safety", choices=["ask", "enforce", "off"], default="ask",
                    help="ask=prompt on dangerous commands, enforce=block them, off=no checks.")
+    r.add_argument("--spider", default="peter",
+                   choices=["peter", "miles", "gwen", "noir", "2099", "ham"],
+                   help="Which Spider answers: peter (default) | miles | gwen | noir | 2099 | ham.")
     r.add_argument("--temp", type=float, default=0.1)
     r.add_argument("--yes", action="store_true",
                    help="Auto-approve command prompts. Convenient but removes the human check.")
     r.add_argument("--quiet", action="store_true", help="Only print the final answer.")
+
+
+def _cmd_up(args) -> int:
+    """One command, whole assistant: ensure Ollama is running and a brain is
+    present, then start the server and open the browser. Jarvis, but Spidey."""
+    import shutil
+    import subprocess
+    import threading
+    import time
+    import webbrowser
+
+    import requests
+
+    from .server.app import serve
+
+    ollama_url = "http://localhost:11434"
+
+    def ollama_alive() -> bool:
+        try:
+            return requests.get(f"{ollama_url}/api/version", timeout=2).ok
+        except requests.RequestException:
+            return False
+
+    if not ollama_alive():
+        if shutil.which("ollama") is None:
+            print("Ollama isn't installed — it's the free runtime for Spidey's offline brain.")
+            print("Get it at https://ollama.com/download, then re-run:  spidey up")
+            return 1
+        print("● Waking up Ollama…")
+        subprocess.Popen(["ollama", "serve"],
+                         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        for _ in range(20):
+            if ollama_alive():
+                break
+            time.sleep(0.5)
+        else:
+            print("✗ Ollama didn't start — try `ollama serve` in another terminal.")
+            return 1
+
+    try:
+        tags = [m["name"] for m in
+                requests.get(f"{ollama_url}/api/tags", timeout=5).json().get("models", [])]
+    except requests.RequestException:
+        tags = []
+    if not any(t.startswith(args.model.split(":")[0]) for t in tags):
+        print(f"● No brain yet — downloading {args.model} (one time)…")
+        if subprocess.run(["ollama", "pull", args.model]).returncode != 0:
+            return 1
+
+    from .voice import voice_status
+    if not voice_status()["available"]:
+        print('  (tip: offline voice is one command away — `spidey setup --voice`)')
+
+    scheme = "https" if args.https else "http"
+    url = f"{scheme}://127.0.0.1:{args.port}/" + (f"?token={args.token}" if args.token else "")
+    if not args.no_open:
+        threading.Timer(1.5, webbrowser.open, [url]).start()
+    return serve(host=args.host, port=args.port, workdir=args.workdir,
+                 token=args.token, https=args.https)
 
 
 def _cmd_setup_voice() -> int:
@@ -87,6 +149,14 @@ def main(argv: Optional[list] = None) -> int:
     )
     sub = parser.add_subparsers(dest="cmd")
     _add_run_parser(sub)
+    u = sub.add_parser("up", help="Start EVERYTHING: Ollama + brain check + web UI + browser.")
+    u.add_argument("--model", default="gemma4:12b", help="Brain to ensure is downloaded.")
+    u.add_argument("--host", default="127.0.0.1")
+    u.add_argument("--port", type=int, default=8000)
+    u.add_argument("--workdir", default=".")
+    u.add_argument("--token", default=None, help="Access token (needed beyond localhost).")
+    u.add_argument("--https", action="store_true", help="Self-signed HTTPS (mic from phones).")
+    u.add_argument("--no-open", action="store_true", help="Don't auto-open the browser.")
     s = sub.add_parser("serve", help="Start the web UI (chat + live agent graph).")
     s.add_argument("--host", default="127.0.0.1")
     s.add_argument("--port", type=int, default=8000)
@@ -115,6 +185,9 @@ def main(argv: Optional[list] = None) -> int:
         from . import __version__
         print(f"spidey {__version__}")
         return 0
+
+    if args.cmd == "up":
+        return _cmd_up(args)
 
     if args.cmd == "setup":
         if args.voice:
@@ -152,6 +225,7 @@ def main(argv: Optional[list] = None) -> int:
             max_steps=args.max_steps,
             verbose=not args.quiet,
             approve=approve,
+            spider=args.spider,
         )
         result = agent.run(task)
         if args.quiet:

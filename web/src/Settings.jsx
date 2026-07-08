@@ -12,37 +12,37 @@ export const PROVIDERS = [
 // All free, all open-weight, all fully offline via `ollama pull <tag>`.
 export const SPIDER_VERSE = [
   {
-    tag: 'gemma4:12b', spider: 'Peter Parker', emoji: '🕷️',
+    tag: 'gemma4:12b', id: 'peter', spider: 'Peter Parker', emoji: '🕷️',
     title: 'The Amazing Spider-Man', size: '7.6 GB',
     note: 'The definitive Spidey. Gemma 4 — native tool-calling, the smartest web on your machine.',
     colors: ['#c81e24', '#2545a8'],
   },
   {
-    tag: 'qwen2.5-coder:7b', spider: 'Miles Morales', emoji: '⚡',
+    tag: 'qwen2.5-coder:7b', id: 'miles', spider: 'Miles Morales', emoji: '⚡',
     title: 'Ultimate Spider-Man', size: '4.7 GB',
     note: 'Young, fast, street-smart. The quickest swing on 16 GB machines — great with code.',
     colors: ['#111111', '#c81e24'],
   },
   {
-    tag: 'gemma4:e4b', spider: 'Spider-Gwen', emoji: '🩰',
+    tag: 'gemma4:e4b', id: 'gwen', spider: 'Spider-Gwen', emoji: '🩰',
     title: 'Ghost-Spider', size: '9.6 GB',
     note: 'Light on her feet. Gemma 4 edge (4.5B effective) — graceful on lighter hardware.',
     colors: ['#f8fafc', '#e11d8f'],
   },
   {
-    tag: 'llama3.1:8b', spider: 'Spider-Man Noir', emoji: '🕵️',
+    tag: 'llama3.1:8b', id: 'noir', spider: 'Spider-Man Noir', emoji: '🕵️',
     title: 'The Noir Timeline', size: '4.9 GB',
     note: 'Old-school detective. Llama 3.1 — a solid, seasoned general assistant.',
     colors: ['#3f3f46', '#a1a1aa'],
   },
   {
-    tag: 'gemma4:26b', spider: 'Miguel O’Hara', emoji: '🔮',
+    tag: 'gemma4:26b', id: '2099', spider: 'Miguel O’Hara', emoji: '🔮',
     title: 'Spider-Man 2099', size: '18 GB',
     note: 'The future. Gemma 4 26B MoE — for 32 GB+ rigs that want frontier-feel offline.',
     colors: ['#1e3a8a', '#dc2626'],
   },
   {
-    tag: 'qwen2.5-coder:1.5b', spider: 'Peter Porker', emoji: '🐷',
+    tag: 'qwen2.5-coder:1.5b', id: 'ham', spider: 'Peter Porker', emoji: '🐷',
     title: 'Spider-Ham', size: '1 GB',
     note: 'The cartoon timeline. Tiny, silly, surprisingly capable — old laptops welcome.',
     colors: ['#f472b6', '#fbbf24'],
@@ -55,6 +55,7 @@ export const OLLAMA_MODELS = SPIDER_VERSE.map(s => ({ tag: s.tag, note: `${s.spi
 export const defaultConfig = {
   provider: 'ollama',
   model: '',
+  spider: 'peter',
   api_key: '',
   base_url: '',
   workdir: '',
@@ -102,7 +103,7 @@ function SpiderVersePicker({ value, onPick }) {
             <button
               key={s.tag}
               type="button"
-              onClick={() => onPick(s.tag)}
+              onClick={() => onPick(s)}
               className={`rounded-xl border p-2.5 text-left transition-all ${
                 active
                   ? 'border-transparent shadow-lg'
@@ -180,7 +181,7 @@ export default function Settings({ config, onSave, onClose }) {
         {cfg.provider === 'ollama' && (
           <SpiderVersePicker
             value={cfg.model || provider.model}
-            onPick={tag => set({ model: tag })}
+            onPick={s => set({ model: s.tag, spider: s.id })}
           />
         )}
 

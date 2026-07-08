@@ -105,6 +105,7 @@ class Session:
                 verbose=False,
                 approve=self.approve,
                 on_event=self.on_event,
+                spider=config.get("spider") or "peter",
             )
             result = agent.run(task, history=self.history[-12:])
             answer = (result.get("answer") or "").strip()
