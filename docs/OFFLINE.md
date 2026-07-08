@@ -90,5 +90,7 @@ to label training pairs — the runtime stays 100 % offline; see
 
 ## Security note (same as everywhere else in this repo)
 
-`spidey serve` has **no authentication** and the agent has shell access. Keep it on
-`127.0.0.1` or a trusted LAN. Never port-forward it to the public internet.
+The agent has shell access — treat the server like SSH. On localhost the defaults
+are fine; for LAN/phone access start it with an access token
+(`spidey serve --host 0.0.0.0 --token <secret>`). Full threat model:
+[SECURITY.md](SECURITY.md).

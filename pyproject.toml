@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "spidey-agent"
-version = "0.1.0"
+version = "1.0.0"
 description = "An open, self-hostable coding agent that runs on free local models — with a QLoRA pipeline to fine-tune its brain."
 readme = "README.md"
 requires-python = ">=3.10"

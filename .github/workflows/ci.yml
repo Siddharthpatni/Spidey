@@ -1,0 +1,60 @@
+# CI: compile the agent, boot the server app, exercise the data generators,
+# and build the web bundle. Model-dependent behavior is verified in real runs
+# (see docs/ARCHITECTURE.md "How this is tested"), not mocked here.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  python:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install (server + voice extras skipped — vosk needs no model at import time)
+        run: pip install -e ".[server]"
+      - name: Compile
+        run: python -m compileall -q spidey training eval
+      - name: Import + app boot
+        run: |
+          python - <<'EOF'
+          import spidey
+          from spidey.server.app import create_app
+          app = create_app(token="ci-token")
+          routes = {r.path for r in app.routes}
+          assert "/ws" in routes and "/ws/voice" in routes, routes
+          print("app boots; routes OK:", sorted(routes))
+          EOF
+      - name: Training data generators (persona SFT + DPO pairs)
+        run: |
+          python - <<'EOF'
+          import sys
+          sys.path.insert(0, "training")
+          from prepare_data import generate_synthetic
+          from prepare_dpo_data import generate_pairs
+          data = generate_synthetic(300)
+          assert all(m["messages"][0]["role"] == "system" for m in data)
+          pairs = generate_pairs(300)
+          assert len(pairs) == 300 and all(p["chosen"]["tool_calls"] for p in pairs)
+          print(f"OK: {len(data)} SFT examples, {len(pairs)} DPO pairs")
+          EOF
+
+  web:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: Build the UI
+        working-directory: web
+        run: |
+          npm ci
+          npm run build

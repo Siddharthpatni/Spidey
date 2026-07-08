@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { wsUrl } from './useSpideySocket.js'
 
 // Offline voice, browser side. The mic is captured with WebAudio, downsampled
 // to 16 kHz PCM16 and streamed over /ws/voice to the local server, where Vosk
@@ -109,8 +110,7 @@ export function useVoice({ onUtterance }) {
     if (!serverStatus?.available || !navigator.mediaDevices?.getUserMedia) return
     setStatus('starting')
     try {
-      const proto = location.protocol === 'https:' ? 'wss' : 'ws'
-      const ws = new WebSocket(`${proto}://${location.host}/ws/voice`)
+      const ws = new WebSocket(wsUrl('/ws/voice'))
       ws.binaryType = 'arraybuffer'
       wsRef.current = ws
 

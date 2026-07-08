@@ -6,6 +6,7 @@
 
 *"With great power comes great responsibility."*
 
+[![CI](https://github.com/Siddharthpatni/Spidey/actions/workflows/ci.yml/badge.svg)](https://github.com/Siddharthpatni/Spidey/actions/workflows/ci.yml)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/)
 [![React](https://img.shields.io/badge/UI-React%20%2B%20Vite%20%2B%20Tailwind-61dafb.svg)](web/)
 [![FastAPI](https://img.shields.io/badge/server-FastAPI%20%2B%20WebSockets-009688.svg)](spidey/server/)
@@ -211,9 +212,27 @@ WebSocket protocol as the web UI. Point it at `spidey serve` on the same machine
 (desktop, fully offline) or at your PC over Wi-Fi (phone, nothing leaves your network).
 Build steps and the honest per-platform offline matrix are in [app/README.md](app/README.md).
 
+## 📚 Documentation
+
+| Doc | What's inside |
+|---|---|
+| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | full system design with diagrams — agent loop, event stream, voice pipeline, persona layers, training flow |
+| [docs/API.md](docs/API.md) | the complete wire protocol (`/ws`, `/ws/voice`, auth) — build your own client |
+| [docs/SECURITY.md](docs/SECURITY.md) | threat model, safety layer, token auth, privacy table, deployment guidance |
+| [docs/OFFLINE.md](docs/OFFLINE.md) | the offline story: models, RAM needs, exactly what touches the internet |
+| [training/README.md](training/README.md) | SFT → DPO math, persona training, base models, Colab recipes |
+| [app/README.md](app/README.md) | Flutter client: per-platform builds + offline matrix |
+
 ## Deploying it (optional)
 
-Spidey is self-hosted by design — `spidey serve` on your laptop is the intended deployment. To put the UI on a small cloud box (Railway, Render, Fly.io) for yourself, use the included [Dockerfile](Dockerfile); users then bring their own API keys through the browser as usual. Don't expose it publicly without adding auth — it's an agent with shell access.
+Spidey is self-hosted by design — `spidey serve` on your laptop is the intended deployment. Reaching it from other devices? Require a token:
+
+```bash
+spidey serve --host 0.0.0.0 --token $(openssl rand -hex 16)
+# open http://<your-ip>:8000/?token=<that token> — the UI remembers it
+```
+
+To put it on a small cloud box (Railway, Render, Fly.io) for yourself, use the included [Dockerfile](Dockerfile) with `$SPIDEY_TOKEN` set and TLS in front. It's an agent with shell access — read [docs/SECURITY.md](docs/SECURITY.md) before exposing anything.
 
 ## Roadmap
 

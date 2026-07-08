@@ -71,12 +71,13 @@ class _ChatScreenState extends State<ChatScreen> {
     final prefs = await SharedPreferences.getInstance();
     config
       ..serverUrl = prefs.getString('serverUrl') ?? config.serverUrl
+      ..token = prefs.getString('token') ?? ''
       ..provider = prefs.getString('provider') ?? config.provider
       ..model = prefs.getString('model') ?? ''
       ..apiKey = prefs.getString('apiKey') ?? ''
       ..safety = prefs.getString('safety') ?? 'ask';
     speakReplies = prefs.getBool('speakReplies') ?? true;
-    client.connect(config.serverUrl);
+    client.connect(config.serverUrl, token: config.token);
     speechReady = await stt.initialize();
     if (mounted) setState(() {});
   }
@@ -302,11 +303,12 @@ class _ChatScreenState extends State<ChatScreen> {
     );
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('serverUrl', config.serverUrl);
+    await prefs.setString('token', config.token);
     await prefs.setString('provider', config.provider);
     await prefs.setString('model', config.model);
     await prefs.setString('apiKey', config.apiKey);
     await prefs.setString('safety', config.safety);
-    client.connect(config.serverUrl);
+    client.connect(config.serverUrl, token: config.token);
   }
 
   @override
@@ -347,6 +349,13 @@ class _SettingsDialogState extends State<SettingsDialog> {
                 labelText: 'Spidey server URL',
                 helperText: 'Where `spidey serve` runs — this device or your LAN'),
             onChanged: (v) => c.serverUrl = v.trim(),
+          ),
+          TextFormField(
+            initialValue: c.token,
+            obscureText: true,
+            decoration: const InputDecoration(
+                labelText: 'Access token (if the server uses --token)'),
+            onChanged: (v) => c.token = v.trim(),
           ),
           DropdownButtonFormField<String>(
             initialValue: c.provider,

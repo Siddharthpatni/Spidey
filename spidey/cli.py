@@ -91,6 +91,9 @@ def main(argv: Optional[list] = None) -> int:
     s.add_argument("--host", default="127.0.0.1")
     s.add_argument("--port", type=int, default=8000)
     s.add_argument("--workdir", default=".", help="Default working directory for agent runs.")
+    s.add_argument("--token", default=None,
+                   help="Require this access token on every connection (also $SPIDEY_TOKEN). "
+                        "Mandatory before exposing Spidey beyond localhost.")
     p = sub.add_parser("setup", help="Download an open-weight model so Spidey runs fully offline.")
     p.add_argument("--model", default="gemma4:12b",
                    help="Ollama model tag to download. Default: gemma4:12b (~7.6 GB).")
@@ -123,7 +126,7 @@ def main(argv: Optional[list] = None) -> int:
                 "The web UI needs the server extras. Install with:\n"
                 '    pip install -e ".[server]"'
             )
-        return serve(host=args.host, port=args.port, workdir=args.workdir)
+        return serve(host=args.host, port=args.port, workdir=args.workdir, token=args.token)
 
     if args.cmd == "run":
         task = args.task

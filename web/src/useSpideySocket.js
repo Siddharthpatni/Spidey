@@ -3,6 +3,25 @@ import { useCallback, useEffect, useReducer, useRef } from 'react'
 // One reducer consumes the server's event stream and derives both views:
 // `chat` (the conversation panel) and `steps` (the live graph).
 
+// Access token for servers started with --token / $SPIDEY_TOKEN. Arrives once
+// via the URL (?token=...), then lives in localStorage; both sockets send it.
+export function authToken() {
+  const url = new URL(window.location.href)
+  const fromUrl = url.searchParams.get('token')
+  if (fromUrl) {
+    localStorage.setItem('spidey-token', fromUrl)
+    url.searchParams.delete('token')
+    window.history.replaceState(null, '', url.toString())
+  }
+  return localStorage.getItem('spidey-token') || ''
+}
+
+export function wsUrl(path) {
+  const proto = location.protocol === 'https:' ? 'wss' : 'ws'
+  const token = authToken()
+  return `${proto}://${location.host}${path}${token ? `?token=${encodeURIComponent(token)}` : ''}`
+}
+
 let nextId = 1
 const uid = () => `i${nextId++}`
 
@@ -123,8 +142,7 @@ export function useSpideySocket() {
     let retry
     let closed = false
     const connect = () => {
-      const proto = location.protocol === 'https:' ? 'wss' : 'ws'
-      ws = new WebSocket(`${proto}://${location.host}/ws`)
+      ws = new WebSocket(wsUrl('/ws'))
       wsRef.current = ws
       ws.onopen = () => dispatch({ type: 'connected' })
       ws.onmessage = e => dispatch({ type: 'ws_event', event: JSON.parse(e.data) })

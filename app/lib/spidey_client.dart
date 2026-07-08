@@ -24,6 +24,7 @@ class ChatMsg {
 
 class SpideyConfig {
   String serverUrl = 'http://127.0.0.1:8000';
+  String token = ''; // access token, for servers started with --token
   String provider = 'ollama';
   String model = '';
   String apiKey = '';
@@ -45,16 +46,20 @@ class SpideyClient extends ChangeNotifier {
   String? lastSpoken; // set on answer/finish so the UI can TTS it once
   WebSocketChannel? _ch;
 
-  Uri _wsUri(String serverUrl) {
+  Uri _wsUri(String serverUrl, String token) {
     final u = Uri.parse(serverUrl);
-    return u.replace(scheme: u.scheme == 'https' ? 'wss' : 'ws', path: '/ws');
+    return u.replace(
+      scheme: u.scheme == 'https' ? 'wss' : 'ws',
+      path: '/ws',
+      queryParameters: token.isEmpty ? null : {'token': token},
+    );
   }
 
-  void connect(String serverUrl) {
+  void connect(String serverUrl, {String token = ''}) {
     _ch?.sink.close();
     connected = false;
     notifyListeners();
-    final ch = WebSocketChannel.connect(_wsUri(serverUrl));
+    final ch = WebSocketChannel.connect(_wsUri(serverUrl, token));
     _ch = ch;
     connected = true; // optimistic; errors flip it back
     ch.stream.listen(

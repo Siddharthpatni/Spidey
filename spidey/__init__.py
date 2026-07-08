@@ -1,6 +1,6 @@
 """Spidey — an open, self-hostable coding agent that runs on free local models."""
 
-__version__ = "0.1.0"
+__version__ = "1.0.0"
 
 from .agent import Agent
 from .tools import Tool, ToolRegistry, default_registry

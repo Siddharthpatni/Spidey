@@ -18,34 +18,43 @@ Everything you need to publish Spidey and get eyes on it. This file is for *you*
 ## 📌 Suggested GitHub repo metadata
 
 **Description (the one-liner under the repo name):**
-> Self-hostable AI agent with a live reasoning graph in your browser. Bring your own model (Claude/Gemini/GPT) or run it free & offline on Ollama — plus an SFT→DPO pipeline to train its own brain.
+> Your friendly neighborhood AI — a fully offline voice assistant + agent. Say "Hey Spidey", watch it think in a live reasoning web, run it on Gemma 4 via Ollama (or your own Claude/Gemini/GPT key), and train its brain with SFT→DPO.
 
 **Topics / tags:**
-`ai-agent` · `llm` · `react` · `fastapi` · `websockets` · `ollama` · `dpo` · `qlora` · `fine-tuning` · `tool-calling` · `local-llm` · `autonomous-agents` · `anthropic` · `gemini` · `openai`
+`ai-agent` · `voice-assistant` · `offline-first` · `llm` · `react` · `fastapi` · `websockets` · `ollama` · `gemma` · `vosk` · `dpo` · `qlora` · `fine-tuning` · `tool-calling` · `local-llm` · `autonomous-agents` · `flutter`
 
 ---
 
-## 💬 LinkedIn post (first-person, honest — edit to taste)
+## 💬 LinkedIn post — v1 announcement (paste-ready)
 
-> I wanted to see *how* an AI agent thinks — not read its logs afterwards. So I built one that draws its reasoning live in the browser.
+> I just shipped v1.0 of a project I've been obsessed with: an AI assistant that runs **entirely on your own machine** — voice and all.
 >
-> Meet **Spidey** 🕷️ — a self-hostable AI agent. You give it a task; it reads files, searches code, writes changes, and runs commands — and every thought and tool call appears as a node in a live graph while it works. When it wants to run something risky, the safety layer pauses the run and asks *you* to approve or deny, right in the UI.
+> Meet **Spidey** 🕷️ — your friendly neighborhood AI.
 >
-> Three design decisions I'm proud of:
+> Say **"Hey Spidey"** and just talk to it. The wake word, the speech-to-text, the model, the spoken reply — every single piece runs offline, on-device. Unplug the router and it still works. No cloud, no per-token bills, no audio or files ever leaving your machine.
 >
-> 1. **Bring your own model.** It runs free and fully offline on open-weight models via Ollama — or you paste your own Claude / Gemini / GPT key in the browser and it uses that. Keys never touch the server's disk.
-> 2. **Train the brain, don't hope.** Small local models are unreliable at tool-calling, so I built a two-stage pipeline: QLoRA SFT teaches the *format*, then DPO (Direct Preference Optimization — the same preference-alignment math used to align frontier models) teaches the *decision*, trained on the exact failure modes small models exhibit: narrating instead of acting, wrong tools, malformed arguments. It fine-tunes on a **free** Colab GPU, and an eval harness measures the before/after instead of vibes.
-> 3. **Safety outside the model.** Command screening and path confinement live in code the model can't touch — a prompt-injected model can't talk its way past them.
+> And you don't have to trust it blindly: while it works, **every thought and tool call is drawn live as a node in a reasoning web** in your browser. When it wants to run something risky, its "spidey-sense" pauses the run and asks you to approve or deny — by click, or just by saying "approve".
 >
-> Stack: Python/FastAPI + WebSockets on the back, React + React Flow + Tailwind on the front, Unsloth/TRL for training.
+> What's under the hood:
 >
-> It's fully open source (MIT) — clone it, run `spidey setup`, and it works entirely on your machine. It even listens: say "Hey Spidey" and talk to it, with wake word, speech-to-text and spoken replies all running offline on-device.
+> 🧠 **Gemma 4 by default** — Google's open-weight model with native function-calling, served locally by Ollama. Or paste your own Claude / Gemini / GPT key; it never touches the server's disk.
+>
+> 🎙 **Offline voice** — Vosk recognizes speech in-process on your machine; replies are spoken with your OS's own voices. There is no cloud speech API anywhere in the loop.
+>
+> 🏋️ **A trainable brain** — small local models are unreliable at tool-calling, so Spidey ships a two-stage pipeline: QLoRA SFT teaches the format, then DPO (the same preference-alignment math behind frontier models) teaches the decision — trained on the exact failure modes small models exhibit. Runs on a free Colab GPU, with an eval harness measuring before/after instead of vibes. It's even trained on the character: Peter Parker's voice, and his philosophy — with great power comes great responsibility — mapped to how an agent should behave.
+>
+> 🛡 **Safety outside the model.** Command screening, path confinement and token auth live in code the model can't talk its way past.
+>
+> 📱 One protocol, every screen: web UI plus a Flutter client for iOS / Android / macOS / Windows / Linux.
+>
+> Fully open source (MIT). Three commands to run it:
+> git clone → spidey setup → spidey serve
 >
 > Repo 👉 https://github.com/Siddharthpatni/Spidey
 >
-> Would genuinely love feedback from anyone working on agents, local LLMs, or preference training.
+> I'd genuinely love feedback from anyone building agents, running local LLMs, or doing preference training — and if you try the voice mode, tell me what it misheard 🙂
 >
-> #AI #LLM #OpenSource #MachineLearning #AIAgents #React #Python #Ollama
+> #AI #LLM #OpenSource #OfflineAI #VoiceAssistant #AIAgents #Ollama #Gemma #MachineLearning #Python #React #Flutter
 
 **Tips for the post:**
 - Lead with the screen recording of the reasoning web — native media gets ~5× the reach of a bare link.

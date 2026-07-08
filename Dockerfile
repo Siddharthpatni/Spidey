@@ -1,14 +1,15 @@
 # Spidey — containerized web UI.
 #
 #   docker build -t spidey .
-#   docker run -p 8000:8000 spidey
+#   docker run -p 8000:8000 -e SPIDEY_TOKEN=$(openssl rand -hex 16) spidey
 #
 # Works as-is on Railway / Render / Fly.io (they set $PORT). Users bring their own
 # Claude/Gemini/GPT keys through the browser; to use Ollama from inside the container,
 # point the Custom provider at a reachable Ollama URL.
 #
 # ⚠ Spidey executes shell commands as an agent. The container is its sandbox — do not
-# mount host paths you care about, and don't expose a public instance without auth.
+# mount host paths you care about. ALWAYS set $SPIDEY_TOKEN on a hosted instance
+# (connections without the token are refused) and put TLS in front. See docs/SECURITY.md.
 
 FROM node:22-slim AS web
 WORKDIR /build

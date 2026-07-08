@@ -30,6 +30,8 @@ from __future__ import annotations
 import asyncio
 import concurrent.futures
 import json
+import os
+import secrets
 import uuid
 from pathlib import Path
 from typing import Any, Dict, Optional
@@ -128,12 +130,33 @@ class Session:
                 fut.set_result(False)
 
 
-def create_app(default_workdir: str = ".") -> FastAPI:
+def create_app(default_workdir: str = ".", token: Optional[str] = None) -> FastAPI:
+    """Build the app. If ``token`` (or $SPIDEY_TOKEN) is set, both WebSockets
+    require ``?token=<value>`` — set it whenever the server is reachable by
+    anyone but you. Without a token, bind to 127.0.0.1 only."""
     app = FastAPI(title="Spidey")
     default_workdir = str(Path(default_workdir).resolve())
+    auth_token = token if token is not None else (os.environ.get("SPIDEY_TOKEN") or None)
+
+    async def _authorized(ws: WebSocket) -> bool:
+        if not auth_token:
+            return True
+        supplied = ws.query_params.get("token", "")
+        if secrets.compare_digest(supplied, auth_token):
+            return True
+        # Complete the handshake and say why before closing (1008 = policy
+        # violation) so clients fail fast with a visible reason, not a hang.
+        await ws.accept()
+        await ws.send_json({"type": "error", "step": 0,
+                            "message": "Access denied: invalid or missing token. "
+                                       "Open the UI with ?token=<your token>."})
+        await ws.close(code=1008, reason="invalid or missing token")
+        return False
 
     @app.websocket("/ws")
     async def ws_endpoint(ws: WebSocket) -> None:
+        if not await _authorized(ws):
+            return
         await ws.accept()
         session = Session(ws, default_workdir)
 
@@ -188,6 +211,8 @@ def create_app(default_workdir: str = ".") -> FastAPI:
 
     @app.websocket("/ws/voice")
     async def ws_voice(ws: WebSocket) -> None:
+        if not await _authorized(ws):
+            return
         await ws.accept()
         status = voice_status()
         if not status["available"]:
@@ -226,10 +251,17 @@ def create_app(default_workdir: str = ".") -> FastAPI:
     return app
 
 
-def serve(host: str = "127.0.0.1", port: int = 8000, workdir: str = ".") -> int:
+def serve(host: str = "127.0.0.1", port: int = 8000, workdir: str = ".",
+          token: Optional[str] = None) -> int:
     import uvicorn
 
-    app = create_app(default_workdir=workdir)
+    token = token or os.environ.get("SPIDEY_TOKEN") or None
+    app = create_app(default_workdir=workdir, token=token)
     print(f"● Spidey web UI → http://{host}:{port}   (agent workdir: {Path(workdir).resolve()})")
+    if token:
+        print(f"  auth: token required → open http://{host}:{port}/?token={token}")
+    elif host not in ("127.0.0.1", "localhost"):
+        print("  ⚠ auth: NONE and the server is not localhost-only. "
+              "Set --token (or $SPIDEY_TOKEN) before exposing Spidey to a network.")
     uvicorn.run(app, host=host, port=port, log_level="warning")
     return 0
