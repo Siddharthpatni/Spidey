@@ -254,7 +254,7 @@ Issues and PRs welcome. Good first contributions: a new tool, a new safety rule,
 
 ## Credits
 
-Built on the shoulders of [Ollama](https://ollama.com/), [Unsloth](https://github.com/unslothai/unsloth), [TRL](https://github.com/huggingface/trl), [React Flow](https://reactflow.dev/), [FastAPI](https://fastapi.tiangolo.com/), and the open-weight model community.
+Built on the shoulders of [Ollama](https://ollama.com/), [Unsloth](https://github.com/unslothai/unsloth), [TRL](https://github.com/huggingface/trl), [React Flow](https://reactflow.dev/), [FastAPI](https://fastapi.tiangolo.com/), [Vosk](https://alphacephei.com/vosk/), and the open-weight model community. Spidey's coding discipline follows the [ponytail](https://github.com/DietrichGebert/ponytail) decision ladder — the best code is the code you never wrote.
 
 ## License
 
