@@ -1,17 +1,19 @@
 <div align="center">
 
+<img src="https://capsule-render.vercel.app/api?type=waving&color=0:B11313,100:1A237E&height=200&section=header&text=Spidey&fontSize=72&fontColor=ffffff&fontAlignY=36&desc=Your%20friendly%20neighbourhood%20self-hostable%20AI%20agent&descSize=18&descAlignY=56&descColor=f5f5f5" width="100%" alt="Spidey" />
+
 # 🕷️ Spidey
 
-**A self-hostable AI agent with a live reasoning web — bring your own model (Claude · Gemini · GPT) or run it free and fully offline. Plus a two-stage SFT → DPO pipeline to train its own brain.**
+**A self-hostable AI agent with a live reasoning web · bring your own model (Claude · Gemini · GPT) or run it free and fully offline. Plus a two-stage SFT → DPO pipeline to train its own brain.**
 
-*"With great power comes great responsibility."*
+> *"With great power comes great responsibility."*
 
-[![CI](https://github.com/Siddharthpatni/Spidey/actions/workflows/ci.yml/badge.svg)](https://github.com/Siddharthpatni/Spidey/actions/workflows/ci.yml)
-[![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/)
-[![React](https://img.shields.io/badge/UI-React%20%2B%20Vite%20%2B%20Tailwind-61dafb.svg)](web/)
-[![FastAPI](https://img.shields.io/badge/server-FastAPI%20%2B%20WebSockets-009688.svg)](spidey/server/)
-[![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
-[![Runs on Ollama](https://img.shields.io/badge/runs%20on-Ollama-black.svg)](https://ollama.com/)
+[![CI](https://img.shields.io/github/actions/workflow/status/Siddharthpatni/Spidey/ci.yml?style=for-the-badge&label=CI&color=B11313)](https://github.com/Siddharthpatni/Spidey/actions/workflows/ci.yml)
+[![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-1A237E?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/)
+[![React](https://img.shields.io/badge/UI-React%20%2B%20Vite%20%2B%20Tailwind-E62429?style=for-the-badge&logo=react&logoColor=white)](web/)
+[![FastAPI](https://img.shields.io/badge/Server-FastAPI%20%2B%20WebSockets-1A237E?style=for-the-badge&logo=fastapi&logoColor=white)](spidey/server/)
+[![Runs on Ollama](https://img.shields.io/badge/Runs%20on-Ollama-000000?style=for-the-badge&logo=ollama&logoColor=white)](https://ollama.com/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-B11313?style=for-the-badge)](LICENSE)
 
 </div>
 
