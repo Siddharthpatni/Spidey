@@ -201,7 +201,8 @@ export function useVoice({ onUtterance }) {
     text => {
       if (!speakReplies || !window.speechSynthesis || !text) return
       window.speechSynthesis.cancel()
-      const utter = new SpeechSynthesisUtterance(text.slice(0, 600))
+      const spoken = text.replace(/[*_`#]/g, '').slice(0, 600)
+      const utter = new SpeechSynthesisUtterance(spoken)
       const voice = pickVoice()
       if (voice) utter.voice = voice
       utter.rate = 1.05

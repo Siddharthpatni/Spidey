@@ -2,6 +2,51 @@ import { useEffect, useRef, useState } from 'react'
 import { styleFor } from './AgentGraph.jsx'
 import { MicButton, SpeakerToggle, VoiceStrip } from './Voice.jsx'
 
+// Minimal markdown for model replies — **bold**, *italic*, `code`, bullets —
+// so answers read like a message, not like raw asterisk soup. Rendered as
+// React elements (never innerHTML), so model output can't inject markup.
+function inlineMd(text) {
+  const parts = []
+  const re = /(\*\*[^*]+\*\*|\*[^*\s][^*]*\*|`[^`]+`)/g
+  let last = 0
+  let m
+  let i = 0
+  while ((m = re.exec(text))) {
+    if (m.index > last) parts.push(text.slice(last, m.index))
+    const t = m[0]
+    if (t.startsWith('**')) parts.push(<strong key={i++}>{t.slice(2, -2)}</strong>)
+    else if (t.startsWith('`'))
+      parts.push(
+        <code key={i++} className="rounded bg-black/30 px-1 font-mono text-[0.9em]">
+          {t.slice(1, -1)}
+        </code>,
+      )
+    else parts.push(<em key={i++}>{t.slice(1, -1)}</em>)
+    last = m.index + t.length
+  }
+  if (last < text.length) parts.push(text.slice(last))
+  return parts
+}
+
+function Md({ text }) {
+  return (
+    <>
+      {String(text).split('\n').map((line, i) => {
+        if (!line.trim()) return <div key={i} className="h-2" />
+        const bullet = /^\s*([-*•]|\d+\.)\s+/.exec(line)
+        if (bullet)
+          return (
+            <div key={i} className="flex gap-1.5 pl-1">
+              <span className="shrink-0">{/^\d/.test(bullet[1]) ? bullet[1] : '•'}</span>
+              <span>{inlineMd(line.slice(bullet[0].length))}</span>
+            </div>
+          )
+        return <div key={i}>{inlineMd(line.replace(/^#+\s+/, ''))}</div>
+      })}
+    </>
+  )
+}
+
 function ToolLine({ m }) {
   const [open, setOpen] = useState(false)
   const s = styleFor({ type: 'tool', tool: m.tool })
@@ -73,11 +118,15 @@ function Message({ m, approval, onAnswer }) {
       return (
         <div className="rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-100">
           <span className="mr-1">🏁</span>
-          {m.text}
+          <Md text={m.text} />
         </div>
       )
     case 'agent':
-      return <div className="spidey-bubble-agent rounded-xl rounded-bl-sm px-3 py-2 text-sm">{m.text}</div>
+      return (
+        <div className="spidey-bubble-agent rounded-xl rounded-bl-sm px-3 py-2 text-sm">
+          <Md text={m.text} />
+        </div>
+      )
     case 'error':
       return (
         <div className="rounded-lg border border-rose-500/40 bg-rose-500/10 px-3 py-2 text-sm text-rose-200">

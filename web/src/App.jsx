@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import AgentGraph, { styleFor } from './AgentGraph.jsx'
 import Chat from './Chat.jsx'
+import History, { deleteSession, loadHistory, saveSession } from './History.jsx'
 import Onboarding from './Onboarding.jsx'
 import Settings, { PROVIDERS, loadConfig, saveConfig } from './Settings.jsx'
 import { useSpideySocket } from './useSpideySocket.js'
@@ -78,14 +79,17 @@ function StepSheet({ step, onClose }) {
 }
 
 export default function App() {
-  const { state, startRun, answerApproval, stopRun } = useSpideySocket()
+  const { state, startRun, answerApproval, stopRun, restore, newChat } = useSpideySocket()
   const [config, setConfig] = useState(loadConfig)
   const [showSettings, setShowSettings] = useState(false)
+  const [showHistory, setShowHistory] = useState(false)
+  const [history, setHistory] = useState(loadHistory)
   const [selected, setSelected] = useState(null)
   const [splash, setSplash] = useState('show') // show -> fading -> gone
   const [showOnboarding, setShowOnboarding] = useState(
     () => localStorage.getItem('spidey-onboarded') !== '1',
   )
+  const sessionIdRef = useRef(Date.now())
 
   // Refs so the voice callback always sees the current run state and config.
   const stateRef = useRef(state)
@@ -138,6 +142,43 @@ export default function App() {
     }
   }, [])
 
+  // Auto-save the session whenever a run finishes (client-side only).
+  useEffect(() => {
+    if (state.status !== 'idle' || state.chat.length === 0) return
+    saveSession({
+      id: sessionIdRef.current,
+      ts: Date.now(),
+      task: state.chat.find(m => m.kind === 'user')?.text?.slice(0, 90) || '(untitled)',
+      chat: state.chat,
+      steps: state.steps,
+    })
+    setHistory(loadHistory())
+  }, [state.status, state.chat, state.steps])
+
+  const openSession = entry => {
+    // Re-key restored messages so ids never collide with live ones, and mark
+    // them spoken so restoring a chat doesn't trigger TTS.
+    const chat = entry.chat.map((m, i) => ({ ...m, id: `h${entry.id}-c${i}` }))
+    const steps = (entry.steps || []).map((s, i) => ({ ...s, id: `h${entry.id}-s${i}` }))
+    chat.forEach(m => spokenRef.current.add(m.id))
+    sessionIdRef.current = entry.id
+    restore(chat, steps)
+    setSelected(null)
+    setShowHistory(false)
+  }
+
+  const removeSession = id => {
+    deleteSession(id)
+    setHistory(loadHistory())
+  }
+
+  const startNewChat = () => {
+    sessionIdRef.current = Date.now()
+    newChat()
+    setSelected(null)
+    setShowHistory(false)
+  }
+
   const provider = PROVIDERS.find(p => p.id === config.provider) || PROVIDERS[0]
 
   const handleSave = cfg => {
@@ -175,6 +216,20 @@ export default function App() {
           </Badge>
           <Badge>{state.runMeta?.model || provider.name}</Badge>
           <Badge>safety: {config.safety}</Badge>
+          {state.status !== 'running' && state.chat.length > 0 && (
+            <button
+              onClick={startNewChat}
+              className="rounded-lg border border-zinc-700 px-3 py-1 text-xs font-semibold text-zinc-300 hover:bg-zinc-800"
+            >
+              ＋ New
+            </button>
+          )}
+          <button
+            onClick={() => setShowHistory(h => !h)}
+            className="rounded-lg border border-zinc-700 px-3 py-1 text-xs font-semibold text-zinc-300 hover:bg-zinc-800"
+          >
+            🕘 History
+          </button>
           <button
             onClick={() => setShowSettings(true)}
             className="rounded-lg border border-zinc-700 px-3 py-1 text-xs font-semibold text-zinc-300 hover:bg-zinc-800"
@@ -184,7 +239,7 @@ export default function App() {
         </div>
       </header>
 
-      <main className="flex min-h-0 flex-1">
+      <main className="relative flex min-h-0 flex-1">
         <section className="w-[380px] shrink-0 border-r border-zinc-800">
           <Chat state={state} voice={voice} onStart={start} onStop={stopRun} onAnswer={answerApproval} />
         </section>
@@ -192,6 +247,14 @@ export default function App() {
           <AgentGraph steps={state.steps} onSelect={setSelected} />
           {selected && <StepSheet step={selected} onClose={() => setSelected(null)} />}
         </section>
+        {showHistory && (
+          <History
+            entries={history}
+            onOpen={openSession}
+            onDelete={removeSession}
+            onClose={() => setShowHistory(false)}
+          />
+        )}
       </main>
 
       {showSettings && (

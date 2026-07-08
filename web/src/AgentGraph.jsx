@@ -13,6 +13,7 @@ import {
 const TOOL_STYLE = {
   task: { icon: '◎', color: '#818cf8', label: 'task' },
   think: { icon: '🧠', color: '#c084fc', label: 'think' },
+  answer: { icon: '💬', color: '#60a5fa', label: 'answer' },
   read_file: { icon: '📖', color: '#38bdf8', label: 'read_file' },
   write_file: { icon: '✏️', color: '#34d399', label: 'write_file' },
   list_directory: { icon: '📂', color: '#2dd4bf', label: 'list_directory' },
@@ -25,6 +26,7 @@ const TOOL_STYLE = {
 export function styleFor(step) {
   if (step.type === 'task') return TOOL_STYLE.task
   if (step.type === 'think') return TOOL_STYLE.think
+  if (step.type === 'answer') return TOOL_STYLE.answer
   if (step.type === 'finish') return TOOL_STYLE.finish
   return TOOL_STYLE[step.tool] || TOOL_STYLE.default
 }
@@ -32,6 +34,7 @@ export function styleFor(step) {
 function subtitle(step) {
   if (step.type === 'task') return step.text
   if (step.type === 'think') return step.text
+  if (step.type === 'answer') return step.text
   if (step.type === 'finish') return step.text
   const a = step.args || {}
   return a.path || a.pattern || a.command || ''

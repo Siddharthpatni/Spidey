@@ -79,6 +79,49 @@ Gemma 4 tags as they land). You can even use Gemini or Claude as a one-time *tea
 to label training pairs — the runtime stays 100 % offline; see
 [training/README.md](../training/README.md).
 
+## Performance: why local runs feel slow, and what to do
+
+Three separate things get blamed as "the model is slow" — know which one you're hitting:
+
+1. **Hidden thinking.** Reasoning models (Gemma 4, Qwen3…) generate a long private
+   chain-of-thought before every answer — measured here: **1,273 hidden tokens for a
+   one-line reply ≈ 107 s** on a base M4. Spidey turns thinking **off by default**
+   (same reply: **1.4 s**). Prefer deliberation over speed? `SPIDEY_THINK=1 spidey serve`.
+2. **Cold model load.** The first request after boot/idle streams the whole model
+   (~8 GB for `gemma4:12b`) from disk into RAM — tens of seconds, worse when the
+   machine is under memory pressure. Spidey passes `keep_alive: 30m` so the weights
+   stay resident between steps and runs; only the *first* request pays this.
+3. **Raw generation speed.** A 12B model on a 16 GB base M-series Mac ≈ 10–15 tok/s.
+   That's physics (memory bandwidth). Pick the model for your hardware:
+
+| Machine | Recommended | Feel |
+|---|---|---|
+| 8–16 GB laptop | `gemma4:e2b` or `qwen2.5-coder:7b` | snappy |
+| 16 GB (this repo's default) | `gemma4:12b` | ~1–3 s per short step once warm |
+| 32 GB+ / discrete GPU | `gemma4:26b` (MoE, 3.8 B active) | fast *and* smart |
+
+### Want cloud speed? Two honest options
+
+- **Bring-your-own-key** (Settings → Claude / Gemini / OpenAI): the *brain* moves to
+  the cloud — instant, frontier-quality — while the agent, safety layer, files and
+  voice stay on your machine. This is the "make it fast" switch; the privacy trade
+  is explicit and yours.
+- **Your own GPU box**: run Ollama (or vLLM/llama.cpp) on any machine you control —
+  a gaming PC, a rented GPU server — and point Spidey's **Custom** provider at its
+  URL. Fast *and* still self-hosted; pair it with `spidey serve --token …`.
+
+### Using Spidey from another device on your network
+
+```bash
+spidey serve --host 0.0.0.0 --token $(openssl rand -hex 16)
+# on the phone/laptop: http://<this-machine's-ip>:8000/?token=<that token>
+```
+
+Chat, runs, approvals and the reasoning web all work over the LAN. One browser rule
+to know: microphones require a *secure context*, so the **mic button works on
+localhost but not on plain `http://<ip>`** — put TLS in front (a one-liner with
+[Caddy](https://caddyserver.com)) if you want voice from remote devices.
+
 ## What needs internet, exactly
 
 | Action | Internet? |

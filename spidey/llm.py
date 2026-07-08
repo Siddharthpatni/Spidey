@@ -120,6 +120,11 @@ class OllamaBackend(LLMBackend):
         self.temperature = temperature
         self.timeout = timeout
         self.name = f"ollama:{model}"
+        # Reasoning models (Gemma 4, Qwen3, …) "think" before answering — measured
+        # at >1200 hidden tokens for a one-liner, ~2 minutes per step on a laptop.
+        # Agents make many steps, so thinking is off by default; SPIDEY_THINK=1
+        # re-enables it if you'd rather trade speed for deliberation.
+        self.think = os.environ.get("SPIDEY_THINK", "0") == "1"
 
     def chat(self, messages, tools):
         import requests  # lazy
@@ -129,10 +134,19 @@ class OllamaBackend(LLMBackend):
             "messages": _to_ollama_messages(messages),
             "tools": _to_openai_tools(tools),
             "stream": False,
+            # Keep the weights in RAM between agent steps — reloading a ~8 GB
+            # model from disk on every step is the other big latency source.
+            "keep_alive": "30m",
             "options": {"temperature": self.temperature},
         }
+        if not self.think:
+            payload["think"] = False
         try:
             resp = requests.post(f"{self.base_url}/api/chat", json=payload, timeout=self.timeout)
+            if resp.status_code == 400 and "think" in resp.text.lower() and "think" in payload:
+                # Model doesn't understand the thinking toggle — retry without it.
+                payload.pop("think")
+                resp = requests.post(f"{self.base_url}/api/chat", json=payload, timeout=self.timeout)
         except requests.exceptions.ConnectionError:
             raise RuntimeError(
                 f"Can't reach Ollama at {self.base_url} — it isn't running (or isn't installed). "

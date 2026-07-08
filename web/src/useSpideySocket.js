@@ -62,6 +62,10 @@ export function reducer(state, action) {
         steps: [],
         approval: null,
       }
+    case 'restore': // load a past conversation (read-only until the next run)
+      return { ...state, status: 'idle', approval: null, chat: action.chat, steps: action.steps }
+    case 'new_chat':
+      return { ...state, status: 'idle', approval: null, chat: [], steps: [] }
     case 'ws_event':
       return applyEvent(state, action.event)
     default:
@@ -121,7 +125,11 @@ function applyEvent(state, ev) {
         steps: [...state.steps, { id: uid(), type: 'finish', text: ev.summary, status: 'ok' }],
       }
     case 'answer':
-      return { ...state, chat: [...state.chat, { id: uid(), kind: 'agent', text: ev.text }] }
+      return {
+        ...state,
+        chat: [...state.chat, { id: uid(), kind: 'agent', text: ev.text }],
+        steps: [...state.steps, { id: uid(), type: 'answer', text: ev.text, status: 'ok' }],
+      }
     case 'max_steps':
       return { ...state, chat: [...state.chat, { id: uid(), kind: 'error', text: 'Stopped: reached the step limit without finishing.' }] }
     case 'error':
@@ -172,5 +180,13 @@ export function useSpideySocket() {
     wsRef.current?.send(JSON.stringify({ type: 'stop' }))
   }, [])
 
-  return { state, startRun, answerApproval, stopRun }
+  const restore = useCallback((chat, steps) => {
+    dispatch({ type: 'restore', chat, steps })
+  }, [])
+
+  const newChat = useCallback(() => {
+    dispatch({ type: 'new_chat' })
+  }, [])
+
+  return { state, startRun, answerApproval, stopRun, restore, newChat }
 }
