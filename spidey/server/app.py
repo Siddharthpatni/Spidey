@@ -251,17 +251,49 @@ def create_app(default_workdir: str = ".", token: Optional[str] = None) -> FastA
     return app
 
 
+def _lan_ip() -> Optional[str]:
+    """This machine's LAN address — what other devices actually dial."""
+    import socket
+
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        s.connect(("10.255.255.255", 1))  # no packets sent; just picks the route
+        return s.getsockname()[0]
+    except OSError:
+        return None
+    finally:
+        s.close()
+
+
+def _port_in_use(port: int) -> bool:
+    import socket
+
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        return s.connect_ex(("127.0.0.1", port)) == 0
+
+
 def serve(host: str = "127.0.0.1", port: int = 8000, workdir: str = ".",
           token: Optional[str] = None) -> int:
     import uvicorn
 
+    if _port_in_use(port):
+        print(f"✗ Port {port} is already serving something (probably another Spidey).")
+        print(f"  Stop it first (e.g. `pkill -f 'spidey serve'`) or pick another port: "
+              f"--port {port + 1}")
+        return 1
+
     token = token or os.environ.get("SPIDEY_TOKEN") or None
     app = create_app(default_workdir=workdir, token=token)
-    print(f"● Spidey web UI → http://{host}:{port}   (agent workdir: {Path(workdir).resolve()})")
-    if token:
-        print(f"  auth: token required → open http://{host}:{port}/?token={token}")
-    elif host not in ("127.0.0.1", "localhost"):
-        print("  ⚠ auth: NONE and the server is not localhost-only. "
-              "Set --token (or $SPIDEY_TOKEN) before exposing Spidey to a network.")
+    q = f"/?token={token}" if token else "/"
+    print(f"● Spidey is up   (agent workdir: {Path(workdir).resolve()})")
+    print(f"  this machine → http://127.0.0.1:{port}{q}")
+    if host not in ("127.0.0.1", "localhost"):
+        lan = _lan_ip()
+        if lan:
+            print(f"  same Wi-Fi   → http://{lan}:{port}{q}")
+        if not token:
+            print("  ⚠ auth: NONE and the server is reachable from the network. "
+                  "Restart with --token (or $SPIDEY_TOKEN).")
+        print("  (voice note: browsers allow the mic on localhost only unless you add HTTPS)")
     uvicorn.run(app, host=host, port=port, log_level="warning")
     return 0
