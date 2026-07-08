@@ -1,0 +1,20 @@
+# Example Ollama Modelfile.
+#
+# Unsloth's save_pretrained_gguf() already writes a ready-to-use Modelfile inside
+# the export directory (./spidey-brain/Modelfile) with the correct chat template.
+# Use THAT one first. This hand-written version is here only if you want to set the
+# system prompt or stop tokens yourself.
+#
+# 1) Check the actual .gguf filename in your export dir (name varies by base model/quant):
+#      ls spidey-brain/*.gguf
+# 2) Point FROM at it, then: ollama create spidey-brain -f ./Modelfile.example
+
+FROM ./spidey-brain/unsloth.Q4_K_M.gguf
+
+PARAMETER temperature 0.1
+# Qwen models end turns with <|im_end|>. For Llama-3.x use <|eot_id|> instead.
+PARAMETER stop "<|im_end|>"
+
+SYSTEM """You are Spidey, an autonomous coding assistant. Complete tasks by calling the
+provided tools. Inspect files before you edit them, verify changes by running commands,
+and call the finish tool with a short summary when the task is done."""

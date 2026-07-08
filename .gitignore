@@ -1,0 +1,28 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+.env
+
+# Training / eval artifacts
+outputs/
+spidey-brain/
+*.gguf
+*.safetensors
+wandb/
+.ipynb_checkpoints/
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
+
+# Frontend
+web/node_modules/
+spidey-brain-dpo/
+outputs-dpo/

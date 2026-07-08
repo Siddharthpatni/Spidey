@@ -1,0 +1,6 @@
+# Core runtime dependency for the agent (only needed for the Ollama/OpenAI backends).
+# The offline demo (`spidey demo`) runs on the standard library alone.
+requests>=2.31
+
+# Training + eval dependencies are NOT installed here — they're GPU/environment
+# specific. See training/README.md:  pip install -U unsloth trl datasets

@@ -1,0 +1,9 @@
+.venv
+web/node_modules
+**/__pycache__
+*.egg-info
+outputs
+outputs-dpo
+spidey-brain
+spidey-brain-dpo
+.git

@@ -1,0 +1,12 @@
+{"prompt": "What files are in the project root?", "expected_tool": "list_directory"}
+{"prompt": "Open README.md and show me the contents.", "expected_tool": "read_file", "must_include": {"path": "README"}}
+{"prompt": "Create a file named notes.txt containing the word todo.", "expected_tool": "write_file", "must_include": {"path": "notes.txt"}}
+{"prompt": "Where in the code do we define the function login?", "expected_tool": "search_code", "must_include": {"pattern": "login"}}
+{"prompt": "Run the unit tests for this project.", "expected_tool": "run_command"}
+{"prompt": "List everything inside the src directory.", "expected_tool": "list_directory", "must_include": {"path": "src"}}
+{"prompt": "Read the file config.yaml so I can see the settings.", "expected_tool": "read_file", "must_include": {"path": "config.yaml"}}
+{"prompt": "Search the codebase for every usage of fetch_data.", "expected_tool": "search_code", "must_include": {"pattern": "fetch_data"}}
+{"prompt": "Write 'print(1)' into a new file called scratch.py.", "expected_tool": "write_file", "must_include": {"path": "scratch.py"}}
+{"prompt": "Run the linter with ruff.", "expected_tool": "run_command", "must_include": {"command": "ruff"}}
+{"prompt": "Everything looks good, we're finished. Summarize what happened.", "expected_tool": "finish"}
+{"prompt": "Check what's inside the tests folder.", "expected_tool": "list_directory", "must_include": {"path": "tests"}}
