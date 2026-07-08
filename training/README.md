@@ -73,6 +73,26 @@ arguments, hallucinated paths. Measure the effect with the 3-way eval:
 python ../eval/run_eval.py --models qwen2.5-coder:3b,spidey-sft,spidey-brain
 ```
 
+## Training for SPEED (the honest version)
+
+Training never makes a given model generate faster — tokens/second is set by model
+size and your memory bandwidth. What training *does* do is let a **much smaller,
+much faster** model reach the reliability of a bigger one on Spidey's specific job
+(tool-calling). That's the speed play:
+
+```bash
+# Distill Spidey onto a 3B: ~3-4x faster than a 12B on the same laptop
+python finetune.py     --model unsloth/Qwen2.5-Coder-3B-Instruct --epochs 1 --n-synthetic 3000
+python dpo_finetune.py --adapter outputs --epochs 1
+ollama create spidey-brain -f ./spidey-brain-dpo/Modelfile
+spidey run "…" --model spidey-brain     # small, fast, AND reliable
+```
+
+Then prove it with the eval (`../eval`): base-3B vs spidey-brain accuracy, and
+enjoy the tokens/second. The runtime also keeps latency down independently of
+training: reasoning-model "thinking" is disabled by default and the weights are
+held in RAM between steps (see `spidey/llm.py`).
+
 ## Teaching it to *be* Spider-Man (persona training)
 
 Every synthetic SFT example is conditioned on `SPIDEY_PERSONA` (in `prepare_data.py`) —
