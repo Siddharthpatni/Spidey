@@ -16,6 +16,11 @@ finish, answer, error, max_steps), plus:
     {"type": "approval_request", "id": str, "prompt": str}
     {"type": "run_done"}   after every run, success or not
 
+A second WebSocket, ``/ws/voice``, carries offline voice: the browser streams
+raw microphone PCM (16 kHz mono s16le) as binary frames; the server answers with
+wake / partial / utterance / sleep events from the on-device recognizer (see
+``spidey.voice``). Nothing is sent to any cloud — recognition happens in-process.
+
 API keys arrive with each start message and live only in that run's backend
 object — the server never writes them to disk.
 """
@@ -24,7 +29,7 @@ from __future__ import annotations
 
 import asyncio
 import concurrent.futures
-import tempfile
+import json
 import uuid
 from pathlib import Path
 from typing import Any, Dict, Optional
@@ -33,10 +38,10 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.staticfiles import StaticFiles
 
 from ..agent import Agent
-from ..demo import DEMO_TASK, demo_script
 from ..events import AgentEvent
-from ..llm import StubBackend, build_backend
+from ..llm import build_backend
 from ..safety import SafetyConfig
+from ..voice import VoiceSession, voice_status
 
 STATIC_DIR = Path(__file__).parent / "static"
 APPROVAL_TIMEOUT = 300  # seconds a run will wait for a human verdict before denying
@@ -87,9 +92,6 @@ class Session:
         try:
             backend = self._build_backend(config)
             workdir = config.get("workdir") or self.default_workdir
-            if config.get("provider") == "demo":
-                workdir = tempfile.mkdtemp(prefix="spidey_demo_")
-                task = task or DEMO_TASK
             agent = Agent(
                 backend,
                 workdir=workdir,
@@ -111,8 +113,6 @@ class Session:
     @staticmethod
     def _build_backend(config: Dict[str, Any]):
         provider = config.get("provider", "ollama")
-        if provider == "demo":
-            return StubBackend(demo_script())
         return build_backend(
             provider,
             model=config.get("model") or None,
@@ -181,6 +181,39 @@ def create_app(default_workdir: str = ".") -> FastAPI:
                     await asyncio.wait_for(run_task, timeout=5)
                 except (asyncio.TimeoutError, asyncio.CancelledError, Exception):
                     pass
+
+    @app.get("/api/voice/status")
+    async def api_voice_status() -> Dict[str, Any]:
+        return voice_status()
+
+    @app.websocket("/ws/voice")
+    async def ws_voice(ws: WebSocket) -> None:
+        await ws.accept()
+        status = voice_status()
+        if not status["available"]:
+            await ws.send_json({"type": "voice_unavailable", **status})
+            await ws.close()
+            return
+
+        # Building the recognizer loads the model on first use (~1 s) — keep it
+        # off the event loop.
+        session: VoiceSession = await asyncio.to_thread(VoiceSession, "wake")
+        await ws.send_json({"type": "voice_ready", "model": status["model"]})
+        try:
+            while True:
+                msg = await ws.receive()
+                if msg.get("type") == "websocket.disconnect":
+                    break
+                if msg.get("bytes"):
+                    events = await asyncio.to_thread(session.feed, msg["bytes"])
+                    for ev in events:
+                        await ws.send_json(ev)
+                elif msg.get("text"):
+                    ctrl = json.loads(msg["text"])
+                    if ctrl.get("type") == "mode" and ctrl.get("mode") in ("wake", "direct"):
+                        await asyncio.to_thread(session.set_mode, ctrl["mode"])
+        except WebSocketDisconnect:
+            pass
 
     if STATIC_DIR.is_dir() and (STATIC_DIR / "index.html").exists():
         app.mount("/", StaticFiles(directory=STATIC_DIR, html=True), name="static")

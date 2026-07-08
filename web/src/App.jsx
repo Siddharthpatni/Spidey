@@ -1,15 +1,17 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import AgentGraph, { styleFor } from './AgentGraph.jsx'
 import Chat from './Chat.jsx'
+import Onboarding from './Onboarding.jsx'
 import Settings, { PROVIDERS, loadConfig, saveConfig } from './Settings.jsx'
 import { useSpideySocket } from './useSpideySocket.js'
+import { useVoice } from './useVoice.js'
 
 function Badge({ children, tone = 'zinc' }) {
   const tones = {
     zinc: 'border-zinc-700 text-zinc-400',
     green: 'border-emerald-600/60 text-emerald-400',
     amber: 'border-amber-600/60 text-amber-300',
-    red: 'border-rose-600/60 text-rose-400',
+    red: 'border-[var(--spidey-red)]/70 text-[var(--spidey-red-bright)]',
   }
   return (
     <span className={`rounded-full border px-2 py-0.5 font-mono text-[11px] ${tones[tone]}`}>
@@ -29,9 +31,14 @@ function Splash({ fading }) {
         <div className="spidey-splash-thread w-px bg-zinc-600" />
         <div className="spidey-splash-spider text-6xl">🕷️</div>
       </div>
-      <h1 className="spidey-splash-quote mt-6 text-2xl font-bold tracking-[0.3em]">SPIDEY</h1>
+      <h1 className="spidey-splash-quote mt-6 text-2xl font-bold tracking-[0.3em] text-[var(--spidey-red-bright)]">
+        SPIDEY
+      </h1>
       <p className="spidey-splash-quote mt-3 max-w-sm text-center text-sm italic text-zinc-400">
         “With great power comes great responsibility.”
+      </p>
+      <p className="spidey-splash-quote mt-1 text-xs text-zinc-600">
+        your friendly neighborhood AI — offline, private, yours
       </p>
     </div>
   )
@@ -76,6 +83,51 @@ export default function App() {
   const [showSettings, setShowSettings] = useState(false)
   const [selected, setSelected] = useState(null)
   const [splash, setSplash] = useState('show') // show -> fading -> gone
+  const [showOnboarding, setShowOnboarding] = useState(
+    () => localStorage.getItem('spidey-onboarded') !== '1',
+  )
+
+  // Refs so the voice callback always sees the current run state and config.
+  const stateRef = useRef(state)
+  stateRef.current = state
+  const configRef = useRef(config)
+  configRef.current = config
+
+  const handleUtterance = useCallback(
+    text => {
+      const s = stateRef.current
+      if (s.approval) {
+        if (/\b(approve|yes|go ahead|do it)\b/i.test(text)) answerApproval(s.approval.id, true)
+        else if (/\b(deny|no|stop|don't)\b/i.test(text)) answerApproval(s.approval.id, false)
+        return
+      }
+      if (s.status === 'running') {
+        if (/^(stop|cancel|abort)\b/i.test(text)) stopRun()
+        return
+      }
+      setSelected(null)
+      startRun(text, configRef.current)
+    },
+    [startRun, stopRun, answerApproval],
+  )
+
+  const voice = useVoice({ onUtterance: handleUtterance })
+
+  // Speak what matters for hands-free use: final answers and approval asks.
+  const voiceRef = useRef(voice)
+  voiceRef.current = voice
+  const spokenRef = useRef(new Set())
+  useEffect(() => {
+    const last = state.chat[state.chat.length - 1]
+    if (!last || spokenRef.current.has(last.id)) return
+    if (last.kind === 'agent' || last.kind === 'finish') {
+      spokenRef.current.add(last.id)
+      voiceRef.current.speak(last.text)
+    } else if (last.kind === 'approval' && last.resolved === null) {
+      spokenRef.current.add(last.id)
+      voiceRef.current.speak('My spidey-sense is tingling — I need your approval to run a risky command. Say approve or deny.')
+    }
+  }, [state.chat])
 
   useEffect(() => {
     const fade = setTimeout(() => setSplash('fading'), 2400)
@@ -98,28 +150,31 @@ export default function App() {
     startRun(task, config)
   }
 
+  const dismissOnboarding = () => {
+    localStorage.setItem('spidey-onboarded', '1')
+    setShowOnboarding(false)
+  }
+
+  const onboardingSettings = () => {
+    dismissOnboarding()
+    setShowSettings(true)
+  }
+
   return (
     <div className="flex h-screen flex-col">
-      <header className="flex items-center gap-3 border-b border-zinc-800 px-4 py-2.5">
+      <header className="spidey-header flex items-center gap-3 px-4 py-2.5">
         <span className="text-lg">🕷️</span>
         <h1 className="text-sm font-bold tracking-wide">Spidey</h1>
-        <span className="text-xs text-zinc-600">local AI agent · live reasoning web</span>
+        <span className="text-xs text-zinc-600">your friendly neighborhood AI · runs on your machine</span>
         <div className="ml-auto flex items-center gap-2">
+          {voice.status === 'listening' && <Badge tone="red">🎙 “hey spidey”</Badge>}
+          {voice.status === 'awake' && <Badge tone="red">🎙 listening…</Badge>}
           {state.status === 'running' && <Badge tone="amber">running</Badge>}
           <Badge tone={state.connected ? 'green' : 'red'}>
             {state.connected ? '● connected' : '○ offline'}
           </Badge>
           <Badge>{state.runMeta?.model || provider.name}</Badge>
           <Badge>safety: {config.safety}</Badge>
-          {config.provider === 'demo' && state.status !== 'running' && (
-            <button
-              onClick={() => start('')}
-              disabled={!state.connected}
-              className="rounded-lg bg-emerald-600 px-3 py-1 text-xs font-semibold hover:bg-emerald-500 disabled:opacity-40"
-            >
-              ▶ Run demo
-            </button>
-          )}
           <button
             onClick={() => setShowSettings(true)}
             className="rounded-lg border border-zinc-700 px-3 py-1 text-xs font-semibold text-zinc-300 hover:bg-zinc-800"
@@ -131,7 +186,7 @@ export default function App() {
 
       <main className="flex min-h-0 flex-1">
         <section className="w-[380px] shrink-0 border-r border-zinc-800">
-          <Chat state={state} onStart={start} onStop={stopRun} onAnswer={answerApproval} />
+          <Chat state={state} voice={voice} onStart={start} onStop={stopRun} onAnswer={answerApproval} />
         </section>
         <section className="relative min-w-0 flex-1">
           <AgentGraph steps={state.steps} onSelect={setSelected} />
@@ -141,6 +196,10 @@ export default function App() {
 
       {showSettings && (
         <Settings config={config} onSave={handleSave} onClose={() => setShowSettings(false)} />
+      )}
+
+      {splash === 'gone' && showOnboarding && (
+        <Onboarding onSettings={onboardingSettings} onClose={dismissOnboarding} />
       )}
 
       {splash !== 'gone' && <Splash fading={splash === 'fading'} />}

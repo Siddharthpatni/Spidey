@@ -1,0 +1,25 @@
+name: spidey_app
+description: "Spidey on every screen — a Flutter client for the Spidey agent: chat, voice, approvals. iOS / Android / macOS / Windows / Linux."
+publish_to: "none"
+version: 0.1.0
+
+environment:
+  sdk: ">=3.8.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  # Same WebSocket protocol as the web UI (spidey/server/app.py).
+  web_socket_channel: ^3.0.0
+  # On-device speech-to-text via the OS engine (offline on iOS/Android where
+  # the OS supports it) — tap the mic to talk.
+  speech_to_text: ^7.0.0
+  # Spoken replies via the OS's local voices — offline.
+  flutter_tts: ^4.1.0
+  shared_preferences: ^2.3.0
+
+dev_dependencies:
+  flutter_lints: ^5.0.0
+
+flutter:
+  uses-material-design: true

@@ -16,13 +16,14 @@
 
 Spidey is an autonomous AI assistant that lives on **your** machine: give it a task and it reads files, searches code, writes changes, and runs commands to get it done — while a **live graph in your browser draws every thought and tool call as a node, in real time**. You watch it weave its reasoning web.
 
-<!-- 🎬 DROP THE DEMO GIF HERE — record `spidey serve` → “Run demo” with a screen recorder -->
+<!-- 🎬 DROP THE DEMO GIF HERE — record `spidey serve` running a real task with a screen recorder -->
 
-Three things make it different:
+Four things make it different:
 
 1. **The graphical brain.** `spidey serve` opens a chat + live agent-graph UI (React + React Flow over FastAPI WebSockets). Every step streams in as an animated node — including the safety layer's **Approve / Deny** prompt when the agent wants to run something risky.
-2. **Bring your own model.** Works out of the box with **Ollama (free, private, offline)** — or paste your own API key and drive it with **Claude, Gemini, or GPT**. Keys stay in your browser; the server never writes them to disk.
-3. **A trainable brain.** A two-stage pipeline — **QLoRA SFT** then **DPO** (Direct Preference Optimization) — teaches a *small free model* to make correct tool-call decisions, with an eval harness to prove the gain. Trains on a free Colab/Kaggle GPU.
+2. **"Hey Spidey" — voice, fully on-device.** Turn on the mic and just talk: an offline wake word + speech-to-text (Vosk, running on *your* machine) hears the task, and replies are spoken with your OS's local voices. No audio ever leaves the device.
+3. **Bring your own model.** Works out of the box with **Ollama (free, private, offline)** — or paste your own API key and drive it with **Claude, Gemini, or GPT**. Keys stay in your browser; the server never writes them to disk.
+4. **A trainable brain.** A two-stage pipeline — **QLoRA SFT** then **DPO** (Direct Preference Optimization) — teaches a *small free model* to make correct tool-call decisions, with an eval harness to prove the gain. Trains on a free Colab/Kaggle GPU.
 
 ---
 
@@ -32,19 +33,19 @@ Autonomous agents are everywhere in 2026 — and almost all of them are cloud-on
 
 The catch with local models is that small ones are *unreliable at tool-calling* — they narrate instead of acting, or malform the arguments. Spidey attacks that with training, not hope: SFT teaches the format, DPO teaches the **decision** (call the tool, the *right* tool, with *valid* arguments).
 
-## See it in 30 seconds (zero setup)
-
-No model, no GPU, no API key — the demo drives the full stack with a scripted stub:
+## Get running (two commands + one download)
 
 ```bash
 git clone https://github.com/Siddharthpatni/Spidey && cd Spidey
-pip install -e ".[server]"
-spidey serve          # → open http://127.0.0.1:8000 and hit “▶ Run demo”
+pip install -e ".[server,voice]"
+spidey setup          # one-time: pulls Gemma 4 to your machine via Ollama
+spidey serve          # → open http://127.0.0.1:8000 and give it a task
 ```
 
-You'll see the chat stream, the reasoning web grow node by node, and the safety layer pause the run for your approval when the agent tries `rm -rf` (it's harmless in the sandboxed demo — that's the point).
-
-Prefer the terminal? `spidey demo` runs the same script as pure text.
+You'll see the chat stream, the reasoning web grow node by node, and the safety layer
+pause for your approval whenever the agent wants to run something risky. Already have
+an API key instead? Skip `spidey setup`, open ⚙ Settings and pick Claude, Gemini or
+OpenAI — key stays in your browser.
 
 ## Pick your brain 🧠
 
@@ -55,27 +56,69 @@ Prefer the terminal? `spidey demo` runs the same script as pure text.
 | **Gemini** (Google) | your key | API | Settings → Gemini → paste key (or `GEMINI_API_KEY`) |
 | **OpenAI** | your key | API | Settings → OpenAI → paste key (or `OPENAI_API_KEY`) |
 | **Custom** | — | you decide | any OpenAI-compatible URL (vLLM, llama.cpp, LM Studio…) |
-| **Demo** | free | offline | scripted stub, for the tour |
 
 Everyone who uses your Spidey instance sets their **own** model and key in the browser — the config lives in `localStorage`, is sent only over the socket for that run, and is never persisted server-side.
+
+**Which local model?** The Settings panel suggests these (all free, open-weight, and
+**fully offline** once pulled — the weights live on your disk, nothing phones home):
+
+| Tag | Size | Why |
+|---|---|---|
+| `gemma4:12b` | ~7.6 GB | **the default.** Google's [Gemma 4](https://deepmind.google/models/gemma/gemma-4/) (Apache 2.0, Apr 2026) — built for agentic workflows with *native function-calling*, 256K context |
+| `gemma4:e4b` / `gemma4:e2b` | ~9.6 / ~7.2 GB | Gemma 4 edge variants (4.5B / 2.3B effective) for lighter machines |
+| `qwen2.5-coder:7b` | ~4.7 GB | strong coding-focused tool-caller |
+| `llama3.1:8b` | ~4.9 GB | strong general assistant |
+| `qwen2.5-coder:1.5b` | ~1 GB | tiny; old laptops and experiments |
+
+*Is Gemma "fully offline"? The Gemma models are — they're open-weight downloads (unlike
+Gemini, which is a cloud API). `spidey setup` pulls the weights once; after that the
+network cable can stay unplugged.*
+
+Honesty clause: a ~10B model on your laptop is not Claude or Gemini-cloud — but Gemma 4
+closes a lot of that gap for tool-calling, and tuned with the [training pipeline](training/)
+a small model gets *reliable* at exactly the thing an agent needs (calling the right tool
+with valid arguments), at zero cost and with zero data sharing.
 
 ## Fully offline, on your machine
 
 ```bash
 # 1. Install Ollama:  https://ollama.com/download
-# 2. Download the whole model to your machine (one time, ~4.7 GB):
-spidey setup
+# 2. Download the whole model to your machine (one time, ~7.6 GB — Gemma 4 12B):
+spidey setup                       # or: spidey setup --model gemma4:e2b (smaller)
 
 # 3. From then on, no internet required:
 spidey run "organize the files in this folder by type" --workdir ~/Downloads
 spidey serve
 ```
 
+## 🎙 Say "Hey Spidey" — offline voice
+
+```bash
+pip install -e ".[voice]"     # vosk: a small on-device speech recognizer
+spidey setup --voice          # one-time ~40 MB model download
+spidey serve                  # click the mic → say "Hey Spidey, …"
+```
+
+Then it's hands-free: **"Hey Spidey — list the files in my downloads folder."**
+A chime confirms the wake word, your words appear live as you speak, the agent runs,
+and the answer is **spoken back** with your OS's built-in voices. When the safety layer
+needs a verdict you can just say *"approve"* or *"deny"*.
+
+Privacy model, precisely: the browser streams mic audio **only to your own server**
+(the same machine, over the local WebSocket), where Vosk transcribes it in-process.
+Wake-word detection, speech-to-text and text-to-speech all work with the network
+cable unplugged. There is no cloud speech API anywhere in the loop.
+
+📚 **The full offline story** — every component, exact RAM needs, what touches the
+internet and when — lives in [docs/OFFLINE.md](docs/OFFLINE.md).
+
 ## How it works
 
 ```mermaid
 flowchart TD
     W[Browser: React + React Flow<br/>chat · live reasoning web · approvals] <-->|WebSocket events| S[FastAPI server]
+    W <-->|mic PCM ↔ wake/transcript<br/>/ws/voice| V[Vosk speech-to-text<br/>on-device, offline]
+    V --- S
     S --> B[Agent loop]
     B --> C{LLM backend<br/>Ollama · Claude · Gemini · GPT · custom · stub}
     C -->|tool call| D[Safety layer<br/>allow · ask · deny]
@@ -91,15 +134,15 @@ The agent keeps an OpenAI-style message history, hands the model JSON-schema too
 ## CLI
 
 ```bash
-spidey serve                                  # web UI (chat + reasoning web)
+spidey serve                                  # web UI (chat + reasoning web + voice)
 spidey setup                                  # download an open model for offline use
+spidey setup --voice                          # download the offline speech model (~40 MB)
 spidey run "fix the failing test" \
-    --backend ollama --model qwen2.5-coder:7b \
+    --backend ollama --model gemma4:12b \
     --workdir ./my-project \                  # sandbox: file tools are confined here
     --safety ask \                            # ask | enforce | off
     --max-steps 25
 spidey run "explain this codebase" --backend anthropic   # or gemini / openai / custom
-spidey demo                                   # offline terminal demo
 ```
 
 ## The trainable brain: SFT → DPO
@@ -151,13 +194,22 @@ Spidey/
 │   ├── llm.py         #   Ollama · Anthropic · Gemini · OpenAI · custom · stub backends
 │   ├── tools.py       #   read, write, list, search, run, finish
 │   ├── safety.py      #   command screening + path confinement
-│   ├── cli.py         #   spidey serve | setup | run | demo
+│   ├── cli.py         #   spidey serve | setup | run
 │   └── server/        #   FastAPI + WebSocket bridge (+ built UI in static/)
-├── web/               # React + Vite + Tailwind + React Flow frontend
+│   ├── voice.py       #   offline wake word + speech-to-text (Vosk, on-device)
+├── web/               # React + Vite + Tailwind + React Flow frontend (chat · graph · voice)
+├── app/               # Flutter client: iOS · Android · macOS · Windows · Linux
 ├── training/          # stage 1 SFT + stage 2 DPO → GGUF → Ollama (free GPU)
-├── eval/              # tool-selection accuracy: base vs SFT vs DPO
-└── examples/          # the zero-setup offline demo
+└── eval/              # tool-selection accuracy: base vs SFT vs DPO
 ```
+
+## 📱 On your phone and every desktop
+
+[`app/`](app/) is a **Flutter** client — same chat, same approvals, tap-to-talk voice —
+that builds for **iOS, Android, macOS, Windows and Linux** and speaks the identical
+WebSocket protocol as the web UI. Point it at `spidey serve` on the same machine
+(desktop, fully offline) or at your PC over Wi-Fi (phone, nothing leaves your network).
+Build steps and the honest per-platform offline matrix are in [app/README.md](app/README.md).
 
 ## Deploying it (optional)
 
@@ -165,15 +217,17 @@ Spidey is self-hosted by design — `spidey serve` on your laptop is the intende
 
 ## Roadmap
 
+- [ ] "Hey Spidey" wake word in the Flutter app (mobile is tap-to-talk today)
 - [ ] Multi-file planning step for larger tasks
 - [ ] More tools (apply-patch/diff editing, container sandbox for `run_command`)
 - [ ] Persistent memory across sessions
 - [ ] Stage 3: GRPO with the eval harness as a verifiable reward
+- [ ] Distillation recipe: Gemini/Claude as teacher for DPO pairs (see training/README)
 - [ ] Session history + shareable run replays in the web UI
 
 ## Contributing
 
-Issues and PRs welcome. Good first contributions: a new tool, a new safety rule, more eval tasks, a provider backend. Please run `spidey demo` and the eval before opening a PR.
+Issues and PRs welcome. Good first contributions: a new tool, a new safety rule, more eval tasks, a provider backend. Please verify with a real local run (`spidey run … --model <your ollama tag>`) and the eval before opening a PR.
 
 ## Credits
 

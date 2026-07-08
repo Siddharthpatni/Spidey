@@ -142,7 +142,7 @@ export function useSpideySocket() {
   }, [])
 
   const startRun = useCallback((task, config) => {
-    dispatch({ type: 'user_task', task: task || '(demo task)' })
+    dispatch({ type: 'user_task', task })
     wsRef.current?.send(JSON.stringify({ type: 'start', task, config }))
   }, [])
 

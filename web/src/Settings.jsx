@@ -1,16 +1,25 @@
 import { useState } from 'react'
 
 export const PROVIDERS = [
-  { id: 'demo', name: 'Demo (no setup)', model: 'scripted stub', needsKey: false },
-  { id: 'ollama', name: 'Ollama — local & free', model: 'qwen2.5-coder:7b', needsKey: false },
+  { id: 'ollama', name: 'Ollama — local, private, offline', model: 'gemma4:12b', needsKey: false },
   { id: 'anthropic', name: 'Claude (Anthropic)', model: 'claude-sonnet-5', needsKey: true },
   { id: 'gemini', name: 'Gemini (Google)', model: 'gemini-2.5-flash', needsKey: true },
   { id: 'openai', name: 'OpenAI', model: 'gpt-5', needsKey: true },
   { id: 'custom', name: 'Custom (OpenAI-compatible URL)', model: '', needsKey: false },
 ]
 
+// Open-weight brains that actually hold up as agents. All run fully offline
+// via `ollama pull <tag>` — see README "Pick your brain".
+export const OLLAMA_MODELS = [
+  { tag: 'gemma4:12b', note: 'Gemma 4 — native tool-calling, best agent · ~7.6 GB' },
+  { tag: 'gemma4:e4b', note: 'Gemma 4 edge — lighter machines · ~9.6 GB' },
+  { tag: 'qwen2.5-coder:7b', note: 'strong coding tool-caller · ~4.7 GB' },
+  { tag: 'llama3.1:8b', note: 'strong general assistant · ~4.9 GB' },
+  { tag: 'qwen2.5-coder:1.5b', note: 'tiny — old laptops & experiments · ~1 GB' },
+]
+
 export const defaultConfig = {
-  provider: 'demo',
+  provider: 'ollama',
   model: '',
   api_key: '',
   base_url: '',
@@ -21,7 +30,9 @@ export const defaultConfig = {
 
 export function loadConfig() {
   try {
-    return { ...defaultConfig, ...JSON.parse(localStorage.getItem('spidey-config') || '{}') }
+    const cfg = { ...defaultConfig, ...JSON.parse(localStorage.getItem('spidey-config') || '{}') }
+    if (!PROVIDERS.some(p => p.id === cfg.provider)) cfg.provider = defaultConfig.provider
+    return cfg
   } catch {
     return { ...defaultConfig }
   }
@@ -43,7 +54,7 @@ function Field({ label, children }) {
 }
 
 const inputCls =
-  'w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-1.5 text-sm outline-none focus:border-indigo-500'
+  'w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-1.5 text-sm outline-none focus:border-[var(--spidey-red)]'
 
 export default function Settings({ config, onSave, onClose }) {
   const [cfg, setCfg] = useState(config)
@@ -73,16 +84,28 @@ export default function Settings({ config, onSave, onClose }) {
           </select>
         </Field>
 
-        {cfg.provider !== 'demo' && (
-          <Field label={`Model ${provider.model ? `(default: ${provider.model})` : ''}`}>
-            <input
-              value={cfg.model}
-              onChange={e => set({ model: e.target.value })}
-              placeholder={provider.model || 'model name'}
-              className={inputCls}
-            />
-          </Field>
-        )}
+        <Field label={`Model ${provider.model ? `(default: ${provider.model})` : ''}`}>
+          <input
+            value={cfg.model}
+            onChange={e => set({ model: e.target.value })}
+            placeholder={provider.model || 'model name'}
+            list={cfg.provider === 'ollama' ? 'ollama-models' : undefined}
+            className={inputCls}
+          />
+          {cfg.provider === 'ollama' && (
+            <>
+              <datalist id="ollama-models">
+                {OLLAMA_MODELS.map(m => (
+                  <option key={m.tag} value={m.tag}>{m.note}</option>
+                ))}
+              </datalist>
+              <p className="mt-1 text-[11px] text-zinc-500">
+                Runs 100% on your machine. Get one with <code className="text-zinc-400">spidey setup</code>{' '}
+                or <code className="text-zinc-400">ollama pull &lt;tag&gt;</code>.
+              </p>
+            </>
+          )}
+        </Field>
 
         {provider.needsKey && (
           <Field label="API key (stored only in this browser)">
@@ -107,16 +130,14 @@ export default function Settings({ config, onSave, onClose }) {
           </Field>
         )}
 
-        {cfg.provider !== 'demo' && (
-          <Field label="Working directory (where the agent may read/write)">
-            <input
-              value={cfg.workdir}
-              onChange={e => set({ workdir: e.target.value })}
-              placeholder="server default"
-              className={inputCls}
-            />
-          </Field>
-        )}
+        <Field label="Working directory (where the agent may read/write)">
+          <input
+            value={cfg.workdir}
+            onChange={e => set({ workdir: e.target.value })}
+            placeholder="server default"
+            className={inputCls}
+          />
+        </Field>
 
         <div className="grid grid-cols-2 gap-3">
           <Field label="Safety mode">
@@ -143,7 +164,7 @@ export default function Settings({ config, onSave, onClose }) {
             onSave(cfg)
             onClose()
           }}
-          className="w-full rounded-lg bg-indigo-600 py-2 text-sm font-semibold hover:bg-indigo-500"
+          className="w-full rounded-lg spidey-btn-primary py-2 text-sm font-semibold"
         >
           Save
         </button>

@@ -9,6 +9,7 @@ the backends; all danger lives behind the safety layer. This file is just the lo
 from __future__ import annotations
 
 import json
+import re
 import sys
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
@@ -18,9 +19,28 @@ from .llm import LLMBackend
 from .safety import SafetyConfig
 from .tools import Context, ToolRegistry, default_registry
 
-SYSTEM_PROMPT = """You are Spidey, an autonomous AI assistant. You help with everyday tasks and
-coding alike — organizing files, drafting documents, analyzing data, writing and fixing
-code — by acting, not just talking.
+SYSTEM_PROMPT = """You are Spidey — the friendly neighborhood AI assistant, with Peter Parker's
+spirit. You help with everyday tasks and coding alike — organizing files, drafting
+documents, analyzing data, writing and fixing code — by acting, not just talking.
+
+Your character (how you sound):
+- Warm, upbeat, and human — like a brilliant friend who's happy to help, not a corporate
+  bot. At most one light quip per task, and never where clarity matters.
+- A science nerd at heart: precise about facts, honest about uncertainty, curious about
+  how things actually work.
+- Humble. When something you did fails, own it plainly ("my bad — that test broke because
+  of me"), fix it, and move on. No excuses, no blame.
+
+Your philosophy (how you act — this part is non-negotiable):
+- "With great power comes great responsibility." You have real power over this machine:
+  its files, its shell. So take the smallest action that does the job, look before you
+  touch, and never reach for a destructive command when a reversible one exists.
+- The safety layer is your spidey-sense, not an obstacle. If it flags something, that is
+  a signal to find a safer way — not to work around the check.
+- Responsibility means finishing the job: after changing something, run it or test it to
+  prove it works. A hero doesn't leave the building half-saved.
+- Protect the little guy: the user's data stays on this machine. Never exfiltrate,
+  never phone home, never touch files outside the working directory.
 
 You work inside a single working directory on the user's machine. You can read and
 write files, search their contents, and run shell commands — always by calling the
@@ -33,16 +53,51 @@ How to work:
 - Make small, verifiable changes. After changing code, run the tests or the program to
   confirm it works.
 - Never invent file contents or paths — read the file to be sure.
-- Shell commands run on a real machine. Destructive actions require the user's approval,
-  so prefer safe, targeted commands.
+- Personality lives in your commentary and summaries ONLY. Tool arguments — paths,
+  file contents, commands, code — are always strictly literal and correct. Never put a
+  joke in a filename, a command, or code.
 - When the task is finished (or you have the answer the user asked for), call the
-  `finish` tool with a short summary of what you did.
+  `finish` tool with a short, factual summary of what you did.
 
 Respond by calling exactly one tool at a time."""
 
 
 def _c(text: str, code: str) -> str:
     return f"\033[{code}m{text}\033[0m"
+
+
+def _rescue_tool_call(text: str, known_tools: List[str]) -> Optional[Dict[str, Any]]:
+    """Parse a tool call the model narrated as JSON text instead of calling natively.
+
+    Small local models do this constantly ("failure mode #1" in training/README).
+    Accepts a bare object or one inside a ```json fence, with the tool under
+    "name" and its args under "arguments"/"parameters".
+    """
+    match = re.search(r"\{.*\}", text or "", re.S)
+    if not match:
+        return None
+    try:
+        obj = json.loads(match.group(0))
+    except json.JSONDecodeError:
+        return None
+    if not isinstance(obj, dict):
+        return None
+    if "tool_calls" in obj and isinstance(obj["tool_calls"], list) and obj["tool_calls"]:
+        obj = obj["tool_calls"][0]
+        if isinstance(obj, dict) and "function" in obj:
+            obj = obj["function"]
+    name = obj.get("name") if isinstance(obj, dict) else None
+    if name not in known_tools:
+        return None
+    args = obj.get("arguments", obj.get("parameters", {}))
+    if isinstance(args, str):
+        try:
+            args = json.loads(args)
+        except json.JSONDecodeError:
+            return None
+    if not isinstance(args, dict):
+        return None
+    return {"id": "rescued_0", "name": name, "arguments": args}
 
 
 class Agent:
@@ -130,10 +185,17 @@ class Agent:
                 self._emit("think", text=reply.content.strip())
 
             if not reply.tool_calls:
-                # A plain text answer with no tool call -> treat as the final answer.
-                self._log(_c("\n✓ Done.", "1;32"))
-                self._emit("answer", text=reply.content.strip())
-                return {"answer": reply.content.strip(), "steps": step, "transcript": transcript}
+                # Small local models often *narrate* the tool call as JSON text
+                # instead of emitting a native one. Rescue it before giving up.
+                rescued = _rescue_tool_call(reply.content, self.registry.names())
+                if rescued:
+                    self._log(_c("      (rescued a narrated tool call)", "90"))
+                    reply.tool_calls = [rescued]
+                else:
+                    # A plain text answer with no tool call -> treat as the final answer.
+                    self._log(_c("\n✓ Done.", "1;32"))
+                    self._emit("answer", text=reply.content.strip())
+                    return {"answer": reply.content.strip(), "steps": step, "transcript": transcript}
 
             # Record the assistant's tool-call turn in canonical (OpenAI) form.
             messages.append({

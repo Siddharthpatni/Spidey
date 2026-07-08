@@ -3,11 +3,85 @@
 
 :root {
   color-scheme: dark;
+  /* Spidey palette: suit red + suit blue on a near-black night sky. */
+  --spidey-red: #c81e24;
+  --spidey-red-bright: #ef3a40;
+  --spidey-blue: #2545a8;
+  --spidey-blue-deep: #16204d;
 }
 
 body {
   @apply bg-zinc-950 text-zinc-100 antialiased;
   font-family: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+}
+
+/* Faint spider web anchored in the chat panel's corner. */
+.spidey-web-bg {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='260' height='260'%3E%3Cg stroke='%238892b0' stroke-opacity='0.13' fill='none'%3E%3Cpath d='M0 0L260 0M0 0L260 65M0 0L260 156M0 0L195 260M0 0L104 260M0 0L0 260'/%3E%3Cpath d='M52 0Q48 24 0 39M113 0Q102 54 0 87M182 0Q163 87 0 143M252 8Q224 121 10 215'/%3E%3C/g%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: top left;
+}
+
+.spidey-header {
+  border-bottom: 1px solid transparent;
+  border-image: linear-gradient(90deg, var(--spidey-red) 0%, #3f3f46 35%, #3f3f46 65%, var(--spidey-blue) 100%) 1;
+}
+
+.spidey-bubble-user {
+  background: linear-gradient(135deg, var(--spidey-red) 0%, #97161b 100%);
+}
+.spidey-bubble-agent {
+  background: linear-gradient(135deg, #1f2937 0%, var(--spidey-blue-deep) 100%);
+  border: 1px solid rgba(37, 69, 168, 0.35);
+}
+
+.spidey-btn-primary {
+  background: linear-gradient(135deg, var(--spidey-red-bright) 0%, var(--spidey-red) 100%);
+  color: #fff;
+}
+.spidey-btn-primary:hover:not(:disabled) {
+  filter: brightness(1.15);
+}
+
+/* Voice states */
+@keyframes spidey-mic-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(239, 58, 64, 0.5); }
+  50% { box-shadow: 0 0 0 7px rgba(239, 58, 64, 0); }
+}
+.spidey-mic-listening {
+  animation: spidey-mic-pulse 1.8s ease-in-out infinite;
+}
+.spidey-mic-awake {
+  animation: spidey-mic-pulse 0.8s ease-in-out infinite;
+  box-shadow: 0 0 18px rgba(239, 58, 64, 0.55);
+}
+.spidey-orb {
+  color: var(--spidey-red);
+  animation: spidey-mic-pulse 1.8s ease-in-out infinite;
+  border-radius: 9999px;
+  line-height: 1;
+}
+.spidey-orb-awake {
+  color: var(--spidey-red-bright);
+  animation: spidey-mic-pulse 0.6s ease-in-out infinite;
+  border-radius: 9999px;
+  line-height: 1;
+}
+
+/* Slim, unobtrusive scrollbars */
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+*::-webkit-scrollbar-thumb {
+  background: #3f3f46;
+  border-radius: 4px;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--spidey-red);
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
 }
 
 /* React Flow dark-theme adjustments */

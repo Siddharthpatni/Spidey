@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { styleFor } from './AgentGraph.jsx'
+import { MicButton, SpeakerToggle, VoiceStrip } from './Voice.jsx'
 
 function ToolLine({ m }) {
   const [open, setOpen] = useState(false)
@@ -30,7 +31,7 @@ function ToolLine({ m }) {
 function ApprovalCard({ m, active, onAnswer }) {
   return (
     <div className="rounded-lg border border-amber-500/50 bg-amber-500/10 px-3 py-2">
-      <div className="mb-1 text-xs font-semibold text-amber-300">⚠ Safety check — approval needed</div>
+      <div className="mb-1 text-xs font-semibold text-amber-300">⚠ Spidey-sense — approval needed</div>
       <pre className="whitespace-pre-wrap font-mono text-[11px] text-amber-100/90">{m.prompt}</pre>
       {m.resolved === null && active ? (
         <div className="mt-2 flex gap-2">
@@ -42,7 +43,7 @@ function ApprovalCard({ m, active, onAnswer }) {
           </button>
           <button
             onClick={() => onAnswer(m.id, false)}
-            className="rounded-md bg-rose-600 px-3 py-1 text-xs font-semibold text-white hover:bg-rose-500"
+            className="rounded-md bg-[var(--spidey-red)] px-3 py-1 text-xs font-semibold text-white hover:bg-[var(--spidey-red-bright)]"
           >
             Deny
           </button>
@@ -61,9 +62,7 @@ function ApprovalCard({ m, active, onAnswer }) {
 function Message({ m, approval, onAnswer }) {
   switch (m.kind) {
     case 'user':
-      return (
-        <div className="ml-8 rounded-xl rounded-br-sm bg-indigo-600/90 px-3 py-2 text-sm">{m.text}</div>
-      )
+      return <div className="spidey-bubble-user ml-8 rounded-xl rounded-br-sm px-3 py-2 text-sm">{m.text}</div>
     case 'think':
       return <div className="px-1 text-sm italic text-zinc-400">🧠 {m.text}</div>
     case 'tool':
@@ -78,7 +77,7 @@ function Message({ m, approval, onAnswer }) {
         </div>
       )
     case 'agent':
-      return <div className="rounded-xl rounded-bl-sm bg-zinc-800 px-3 py-2 text-sm">{m.text}</div>
+      return <div className="spidey-bubble-agent rounded-xl rounded-bl-sm px-3 py-2 text-sm">{m.text}</div>
     case 'error':
       return (
         <div className="rounded-lg border border-rose-500/40 bg-rose-500/10 px-3 py-2 text-sm text-rose-200">
@@ -90,7 +89,7 @@ function Message({ m, approval, onAnswer }) {
   }
 }
 
-export default function Chat({ state, onStart, onStop, onAnswer }) {
+export default function Chat({ state, voice, onStart, onStop, onAnswer }) {
   const [task, setTask] = useState('')
   const endRef = useRef(null)
 
@@ -107,15 +106,16 @@ export default function Chat({ state, onStart, onStop, onAnswer }) {
   }
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="spidey-web-bg flex h-full flex-col">
       <div className="flex-1 space-y-2 overflow-y-auto p-3">
         {state.chat.length === 0 && (
           <div className="mt-10 space-y-2 text-center text-sm text-zinc-500">
             <div className="text-3xl">🕷️</div>
-            <p>Give Spidey a task — it reads, writes, searches and runs code to get it done.</p>
+            <p className="font-semibold text-zinc-400">Your friendly neighborhood AI.</p>
+            <p>Type a task — or turn on the mic and say “Hey Spidey”.</p>
             <p className="text-xs text-zinc-600">
-              No model set up yet? Pick <span className="font-semibold text-zinc-400">Demo</span> in
-              settings and hit <span className="font-semibold text-zinc-400">Run demo</span>.
+              No model yet? Run <code className="text-zinc-400">spidey setup</code> once, or pick a
+              provider in <span className="font-semibold text-zinc-400">⚙ Settings</span>.
             </p>
           </div>
         )}
@@ -124,6 +124,7 @@ export default function Chat({ state, onStart, onStop, onAnswer }) {
         ))}
         <div ref={endRef} />
       </div>
+      <VoiceStrip voice={voice} />
       <div className="border-t border-zinc-800 p-3">
         <div className="flex gap-2">
           <textarea
@@ -135,14 +136,18 @@ export default function Chat({ state, onStart, onStop, onAnswer }) {
                 submit()
               }
             }}
-            placeholder={state.connected ? 'Describe a task…' : 'Connecting…'}
+            placeholder={state.connected ? 'Describe a task… or say “Hey Spidey”' : 'Connecting…'}
             rows={2}
-            className="flex-1 resize-none rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm outline-none placeholder:text-zinc-600 focus:border-indigo-500"
+            className="flex-1 resize-none rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm outline-none placeholder:text-zinc-600 focus:border-[var(--spidey-red)]"
           />
+          <div className="flex flex-col gap-2">
+            <MicButton voice={voice} />
+            <SpeakerToggle voice={voice} />
+          </div>
           {running ? (
             <button
               onClick={onStop}
-              className="rounded-lg bg-rose-600 px-4 text-sm font-semibold hover:bg-rose-500"
+              className="rounded-lg bg-[var(--spidey-red)] px-4 text-sm font-semibold hover:bg-[var(--spidey-red-bright)]"
             >
               Stop
             </button>
@@ -150,7 +155,7 @@ export default function Chat({ state, onStart, onStop, onAnswer }) {
             <button
               onClick={submit}
               disabled={!state.connected || !task.trim()}
-              className="rounded-lg bg-indigo-600 px-4 text-sm font-semibold hover:bg-indigo-500 disabled:opacity-40"
+              className="spidey-btn-primary rounded-lg px-4 text-sm font-semibold disabled:opacity-40"
             >
               Run
             </button>

@@ -9,16 +9,17 @@ description = "An open, self-hostable coding agent that runs on free local model
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }
-authors = [{ name = "Your Name" }]
+authors = [{ name = "Siddharth Patni" }]
 keywords = ["ai-agent", "coding-agent", "ollama", "llm", "qlora", "tool-calling", "local-llm"]
 dependencies = ["requests>=2.31"]
 
 [project.optional-dependencies]
 server = ["fastapi>=0.110", "uvicorn>=0.29", "websockets>=12.0"]
+voice = ["vosk>=0.3.45"]
 
 [project.urls]
-Homepage = "https://github.com/your-username/spidey"
-Issues = "https://github.com/your-username/spidey/issues"
+Homepage = "https://github.com/Siddharthpatni/Spidey"
+Issues = "https://github.com/Siddharthpatni/Spidey/issues"
 
 [project.scripts]
 spidey = "spidey.cli:main"

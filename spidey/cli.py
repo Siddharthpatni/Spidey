@@ -5,7 +5,6 @@
     spidey run "fix the failing test" --backend anthropic     # bring your own key
     spidey run --file task.md --workdir ./myproject --safety enforce
     spidey serve           # web UI: chat + live agent graph
-    spidey demo            # offline, no model required
     spidey version
 """
 
@@ -26,7 +25,7 @@ def _add_run_parser(sub: argparse._SubParsersAction) -> None:
     r.add_argument("--file", help="Read the task from a file instead of the argument.")
     r.add_argument("--model", default=None,
                    help="Model name; defaults to the provider's preset "
-                        "(ollama: qwen2.5-coder:7b, anthropic: claude-sonnet-5, ...).")
+                        "(ollama: gemma4:12b, anthropic: claude-sonnet-5, ...).")
     r.add_argument("--backend", choices=list(PROVIDER_PRESETS),
                    default="ollama",
                    help="ollama (local, free) | anthropic | gemini | openai | custom "
@@ -43,6 +42,21 @@ def _add_run_parser(sub: argparse._SubParsersAction) -> None:
     r.add_argument("--yes", action="store_true",
                    help="Auto-approve command prompts. Convenient but removes the human check.")
     r.add_argument("--quiet", action="store_true", help="Only print the final answer.")
+
+
+def _cmd_setup_voice() -> int:
+    """Download the offline speech model so 'Hey Spidey' works without internet."""
+    from . import voice
+
+    if not voice.vosk_installed():
+        print("Voice needs the vosk recognizer (runs 100% on your machine). Install it with:")
+        print('    pip install -e ".[voice]"')
+        print("then re-run:  spidey setup --voice")
+        return 1
+    voice.download_model()
+    print("\n✓ Offline voice is ready. Run `spidey serve`, click the mic, and say:")
+    print('    "Hey Spidey, …"')
+    return 0
 
 
 def _cmd_setup(model: str) -> int:
@@ -78,9 +92,11 @@ def main(argv: Optional[list] = None) -> int:
     s.add_argument("--port", type=int, default=8000)
     s.add_argument("--workdir", default=".", help="Default working directory for agent runs.")
     p = sub.add_parser("setup", help="Download an open-weight model so Spidey runs fully offline.")
-    p.add_argument("--model", default="qwen2.5-coder:7b",
-                   help="Ollama model tag to download. Default: qwen2.5-coder:7b (~4.7 GB).")
-    sub.add_parser("demo", help="Run an offline demo with a stub model (no Ollama needed).")
+    p.add_argument("--model", default="gemma4:12b",
+                   help="Ollama model tag to download. Default: gemma4:12b (~7.6 GB).")
+    p.add_argument("--voice", action="store_true",
+                   help="Also/only download the offline speech model (~40 MB) for "
+                        "'Hey Spidey' voice control.")
     sub.add_parser("version", help="Print the version and exit.")
 
     args = parser.parse_args(argv)
@@ -95,11 +111,9 @@ def main(argv: Optional[list] = None) -> int:
         return 0
 
     if args.cmd == "setup":
+        if args.voice:
+            return _cmd_setup_voice()
         return _cmd_setup(args.model)
-
-    if args.cmd == "demo":
-        from .demo import run_demo
-        return run_demo()
 
     if args.cmd == "serve":
         try:

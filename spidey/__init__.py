@@ -4,7 +4,7 @@ __version__ = "0.1.0"
 
 from .agent import Agent
 from .tools import Tool, ToolRegistry, default_registry
-from .llm import OllamaBackend, OpenAIBackend, StubBackend
+from .llm import OllamaBackend, OpenAIBackend
 from .safety import SafetyConfig
 
 __all__ = [
@@ -14,7 +14,6 @@ __all__ = [
     "default_registry",
     "OllamaBackend",
     "OpenAIBackend",
-    "StubBackend",
     "SafetyConfig",
     "__version__",
 ]

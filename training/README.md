@@ -73,6 +73,26 @@ arguments, hallucinated paths. Measure the effect with the 3-way eval:
 python ../eval/run_eval.py --models qwen2.5-coder:3b,spidey-sft,spidey-brain
 ```
 
+## Teaching it to *be* Spider-Man (persona training)
+
+Every synthetic SFT example is conditioned on `SPIDEY_PERSONA` (in `prepare_data.py`) —
+a compact version of the runtime system prompt: Peter Parker's voice (warm, quippy,
+science-nerd precise, owns his mistakes) plus the philosophy that actually matters for
+an agent: *with great power comes great responsibility* → smallest action that works,
+look before you touch, reversible over destructive, safety layer = spidey-sense.
+
+Two kinds of examples carry it:
+
+- **~8% persona-chat exchanges** — identity/philosophy questions answered in plain text,
+  in character. These do double duty: they teach the voice *and* the boundary "a pure
+  question gets prose, not a tool call".
+- **Tool-call examples with the persona system prompt** — so the character never leaks
+  into arguments: paths, commands and code stay strictly literal while the *summaries*
+  get the flavor.
+
+The DPO stage stays persona-neutral on purpose: it trains *decisions* (which tool, which
+arguments), and mixing style preferences into decision pairs muddies both signals.
+
 ## Data: synthetic vs. real
 
 - **Synthetic (default).** Generated here, no downloads, no dataset agreements. It teaches
@@ -93,6 +113,24 @@ Confirm the current tag at <https://unsloth.ai/docs> (they move fast). Solid sma
 - `unsloth/Qwen2.5-Coder-3B-Instruct` — coding-focused, good default (this repo's default).
 - `unsloth/Qwen3-4B-Instruct` — a bit larger, strong general tool-use.
 - `unsloth/Llama-3.2-3B-Instruct` — set the stop token to `<|eot_id|>` in the Modelfile.
+- `unsloth/gemma-3-4b-it` — Google's open **Gemma** (the open-weight sibling of Gemini;
+  see the [google-gemini](https://github.com/google-gemini) org and its
+  [gemma-cookbook](https://github.com/google-gemini/gemma-cookbook)). Strong instruction
+  following for its size; Gemma uses its own chat template and `<end_of_turn>` stop token —
+  Unsloth's exported Modelfile handles both. Both stages take it via
+  `--model unsloth/gemma-3-4b-it`. **Gemma 4** (Apr 2026) is the family to prefer once
+  Unsloth publishes 4-bit tags for its E2B/E4B edge variants — check
+  <https://unsloth.ai/docs>; the inference-side default (`ollama pull gemma4:12b`) already
+  uses it.
+
+### Borrowing a big brain: distillation from Gemini / Claude
+
+The free tier of a frontier API is a legitimate **teacher** for stage-2 data: have Gemini or
+Claude label which of two candidate tool-calls is correct (or generate the "chosen" side
+outright), and DPO-train the small local model on those preferences. That's classic
+distillation — the *user's* runtime stays 100% offline; only *you*, the trainer, ever touch
+the API, once, to build the dataset. `prepare_dpo_data.py --source hf` is the drop-in place
+to swap in teacher-labeled pairs.
 
 ## The one gotcha that bites everyone
 

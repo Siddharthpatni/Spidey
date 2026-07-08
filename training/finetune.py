@@ -20,7 +20,9 @@ Then on your own machine (where Ollama lives):
 Notes:
   * Confirm the base model tag is live at https://unsloth.ai/docs (tags move fast).
     Good small choices in 2026: unsloth/Qwen2.5-Coder-3B-Instruct, unsloth/Qwen3-4B-Instruct,
-    unsloth/Llama-3.2-3B-Instruct.
+    unsloth/Llama-3.2-3B-Instruct, unsloth/gemma-3-4b-it (Google's open Gemma 3 — see
+    github.com/google-gemini/gemma-cookbook; its chat template/stop token differ, and the
+    exported Modelfile handles that).
   * The #1 cause of "works in the notebook, gibberish in Ollama" is a chat-template
     mismatch. Unsloth's exporter writes a matching Modelfile for you — use it.
   * Tested against unsloth 2026.x + trl ~0.22. If SFTConfig rejects `max_seq_length`,

@@ -12,13 +12,10 @@ Backends:
                                  fine-tuned GGUF served via ``llama-server``).
                                  Also covers OpenAI and Gemini via PROVIDER_PRESETS.
   * :class:`AnthropicBackend`  — Claude, via the native Messages API.
-  * :class:`StubBackend`       — a deterministic, scripted "model" for offline demos
-                                 and unit tests. No network, no GPU.
 
 Bring your own key: hosted providers read their key from the standard env var
 (``ANTHROPIC_API_KEY``, ``GEMINI_API_KEY``, ``OPENAI_API_KEY``) unless one is
-passed explicitly. ``requests`` is imported lazily inside the network backends so
-the Stub path and the offline demo run with only the Python standard library.
+passed explicitly. ``requests`` is imported lazily inside the network backends.
 """
 
 from __future__ import annotations
@@ -134,7 +131,19 @@ class OllamaBackend(LLMBackend):
             "stream": False,
             "options": {"temperature": self.temperature},
         }
-        resp = requests.post(f"{self.base_url}/api/chat", json=payload, timeout=self.timeout)
+        try:
+            resp = requests.post(f"{self.base_url}/api/chat", json=payload, timeout=self.timeout)
+        except requests.exceptions.ConnectionError:
+            raise RuntimeError(
+                f"Can't reach Ollama at {self.base_url} — it isn't running (or isn't installed). "
+                "Install it from https://ollama.com/download, start it (`ollama serve` or the app), "
+                "then pull a brain: `spidey setup`. No Ollama? Pick a cloud provider in Settings."
+            ) from None
+        if resp.status_code == 404 and "not found" in resp.text.lower():
+            raise RuntimeError(
+                f"Ollama is running but the model '{self.model}' isn't downloaded yet. "
+                f"Run: `ollama pull {self.model}`  (or `spidey setup --model {self.model}`)."
+            )
         resp.raise_for_status()
         msg = resp.json().get("message", {})
         return AssistantReply(
@@ -268,41 +277,13 @@ class AnthropicBackend(LLMBackend):
         return AssistantReply(content=content, tool_calls=tool_calls)
 
 
-class StubBackend(LLMBackend):
-    """Replays a fixed script of :class:`AssistantReply` objects. For demos/tests."""
-
-    def __init__(self, script: List[AssistantReply]):
-        self.script = list(script)
-        self._i = 0
-        self.name = "stub"
-
-    def chat(self, messages, tools):
-        if self._i >= len(self.script):
-            return AssistantReply(
-                tool_calls=[{"id": "call_end", "name": "finish",
-                             "arguments": {"summary": "stub script finished"}}]
-            )
-        reply = self.script[self._i]
-        self._i += 1
-        return reply
-
-
-# Convenience builders for writing stub scripts.
-def tool_call(name: str, **arguments: Any) -> AssistantReply:
-    return AssistantReply(tool_calls=[{"id": f"call_{name}", "name": name, "arguments": arguments}])
-
-
-def say(content: str) -> AssistantReply:
-    return AssistantReply(content=content)
-
-
 # --------------------------------------------------------------------------- #
 # Provider registry — one place that knows how to build every backend.
 # --------------------------------------------------------------------------- #
 # Gemini and OpenAI both expose OpenAI-compatible endpoints, so they reuse
 # OpenAIBackend with a preset base URL; Claude gets the native backend above.
 PROVIDER_PRESETS: Dict[str, Dict[str, str]] = {
-    "ollama":    {"default_model": "qwen2.5-coder:7b", "key_env": "",
+    "ollama":    {"default_model": "gemma4:12b", "key_env": "",
                   "base_url": "http://localhost:11434"},
     "anthropic": {"default_model": "claude-sonnet-5", "key_env": "ANTHROPIC_API_KEY",
                   "base_url": "https://api.anthropic.com"},

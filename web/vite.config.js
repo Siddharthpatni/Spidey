@@ -14,6 +14,7 @@ export default defineConfig({
     // `npm run dev` proxies the socket to a locally running `spidey serve`.
     proxy: {
       '/ws': { target: 'ws://127.0.0.1:8000', ws: true },
+      '/api': { target: 'http://127.0.0.1:8000' },
     },
   },
 })

@@ -6,9 +6,10 @@ Everything you need to publish Spidey and get eyes on it. This file is for *you*
 
 ## ✅ Before you go public (10-minute checklist)
 
-1. **Fill in the placeholders:** `Your Name` in `LICENSE` + `pyproject.toml`.
+1. ~~Fill in the placeholders~~ — done (`Siddharth Patni` in `LICENSE` + `pyproject.toml`).
 2. **Record THE demo GIF.** This is the single biggest driver of stars and LinkedIn reach:
-   - Run `spidey serve`, open the browser, start a screen recording (QuickTime/Kap), hit **▶ Run demo**.
+   - Run `spidey serve`, open the browser, start a screen recording (QuickTime/Kap), and give it a real
+     task — or click the mic and say **"Hey Spidey, organize this folder"** (voice makes a killer clip).
    - Capture: the splash ("With great power…"), the reasoning web growing node by node, the amber **Approve/Deny** safety card, the green finish card. ~25 seconds.
    - Export as GIF/MP4 and drop it at the `<!-- 🎬 -->` marker in README.md. (LinkedIn: upload the MP4 natively — native video massively outperforms links.)
 3. **Run the fine-tune once for real** on a free Colab/Kaggle GPU (stage 1 + stage 2) and **paste your real eval numbers** into the README table (replace the illustrative rows). Real before/after numbers are what make the post credible.
@@ -38,7 +39,7 @@ Everything you need to publish Spidey and get eyes on it. This file is for *you*
 >
 > Stack: Python/FastAPI + WebSockets on the back, React + React Flow + Tailwind on the front, Unsloth/TRL for training.
 >
-> It's fully open source (MIT), with a zero-setup demo — clone it and watch it work in 30 seconds.
+> It's fully open source (MIT) — clone it, run `spidey setup`, and it works entirely on your machine. It even listens: say "Hey Spidey" and talk to it, with wake word, speech-to-text and spoken replies all running offline on-device.
 >
 > Repo 👉 https://github.com/Siddharthpatni/Spidey
 >

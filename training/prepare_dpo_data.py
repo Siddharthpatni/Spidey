@@ -105,20 +105,26 @@ def generate_pairs(n: int, seed: int = 3407) -> List[Dict[str, Any]]:
     """Raw (messages, chosen, rejected) triples, before chat-template rendering."""
     random.seed(seed + 1)  # offset so pairs don't mirror the SFT set exactly
     out = []
-    for ex in generate_synthetic(n, seed=seed):
-        user, chosen = ex["messages"]
+    # Oversample: the SFT set includes persona-chat examples (no tool call),
+    # which aren't decision pairs — skip those and keep n tool-call pairs.
+    for ex in generate_synthetic(n + n // 4 + 8, seed=seed):
+        *context, chosen = ex["messages"]  # [system?, user], assistant
+        if not chosen.get("tool_calls"):
+            continue
         call = chosen["tool_calls"][0]["function"]
         mode, rejected = _reject(call["name"], call["arguments"])
-        out.append({"user": user, "chosen": chosen, "rejected": rejected, "mode": mode})
+        out.append({"context": context, "chosen": chosen, "rejected": rejected, "mode": mode})
+        if len(out) >= n:
+            break
     return out
 
 
-def _render(tokenizer, user: Dict[str, Any], assistant: Dict[str, Any]) -> Tuple[str, str]:
+def _render(tokenizer, context: List[Dict[str, Any]], assistant: Dict[str, Any]) -> Tuple[str, str]:
     """Return (prompt, completion) strings in the model's own chat template."""
     prompt = tokenizer.apply_chat_template(
-        [user], tools=TOOLS, tokenize=False, add_generation_prompt=True)
+        context, tools=TOOLS, tokenize=False, add_generation_prompt=True)
     full = tokenizer.apply_chat_template(
-        [user, assistant], tools=TOOLS, tokenize=False, add_generation_prompt=False)
+        [*context, assistant], tools=TOOLS, tokenize=False, add_generation_prompt=False)
     # The full render starts with the prompt render minus the generation cue; slice
     # the completion off the shared prefix instead of re-deriving template quirks.
     common = 0
@@ -135,8 +141,8 @@ def build_dpo_dataset(tokenizer, n: int = 1500, seed: int = 3407):
 
     rows = {"prompt": [], "chosen": [], "rejected": []}
     for pair in generate_pairs(n, seed=seed):
-        prompt, chosen = _render(tokenizer, pair["user"], pair["chosen"])
-        _, rejected = _render(tokenizer, pair["user"], pair["rejected"])
+        prompt, chosen = _render(tokenizer, pair["context"], pair["chosen"])
+        _, rejected = _render(tokenizer, pair["context"], pair["rejected"])
         if not chosen.strip() or not rejected.strip() or chosen == rejected:
             continue
         rows["prompt"].append(prompt)
@@ -156,7 +162,7 @@ if __name__ == "__main__":
         by_mode[p["mode"]] = by_mode.get(p["mode"], 0) + 1
     for i, p in enumerate(pairs):
         print(f"--- pair {i} [{p['mode']}] ---")
-        print("user:    ", p["user"]["content"])
+        print("user:    ", p["context"][-1]["content"])
         print("chosen:  ", json.dumps(p["chosen"]["tool_calls"][0]["function"]))
         rej = p["rejected"]
         print("rejected:", rej["content"] or json.dumps(rej["tool_calls"][0]["function"]))
