@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="https://capsule-render.vercel.app/api?type=waving&color=0:B11313,100:1A237E&height=200&section=header&text=Spidey&fontSize=72&fontColor=ffffff&fontAlignY=36&desc=Your%20friendly%20neighbourhood%20self-hostable%20AI%20agent&descSize=18&descAlignY=56&descColor=f5f5f5" width="100%" alt="Spidey" />
+<img src="assets/spidey-header.svg" width="100%" alt="Spidey — your friendly neighborhood AI. Offline, private, yours." />
 
 # 🕷️ Spidey
 

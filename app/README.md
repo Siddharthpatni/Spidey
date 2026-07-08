@@ -6,20 +6,21 @@ macOS, Windows and Linux**. It speaks the exact WebSocket protocol of `spidey se
 
 ## Build it
 
-The repo ships the Dart code only (no generated platform folders). With the
-[Flutter SDK](https://docs.flutter.dev/get-started/install) installed:
+Platform runners are committed — with the
+[Flutter SDK](https://docs.flutter.dev/get-started/install) installed it's just:
 
 ```bash
 cd app
-flutter create . --project-name spidey_app --org dev.spidey \
-    --platforms=ios,android,macos,windows,linux
 flutter pub get
 flutter run                      # picks a connected device/desktop
 flutter build apk                # Android
 flutter build macos              # macOS, etc.
 ```
 
-Two platform permissions to add after `flutter create`:
+Verified: `flutter analyze` is clean and the release build compiles and boots
+(web target; it connects to the server and correctly walks the auth flow).
+
+Two platform permissions to add before shipping voice:
 
 - **iOS** (`ios/Runner/Info.plist`): `NSMicrophoneUsageDescription` and
   `NSSpeechRecognitionUsageDescription` (any short string).

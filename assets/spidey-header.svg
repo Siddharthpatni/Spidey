@@ -1,0 +1,71 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 300" font-family="Segoe UI, Helvetica, Arial, sans-serif">
+  <defs>
+    <linearGradient id="suit" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#ef3a40"/>
+      <stop offset="0.55" stop-color="#c81e24"/>
+      <stop offset="1" stop-color="#3b5bdb"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.5" cy="0.35" r="0.8">
+      <stop offset="0" stop-color="#1a1030"/>
+      <stop offset="1" stop-color="#0b0b10"/>
+    </radialGradient>
+    <style>
+      .web { stroke:#8892b0; stroke-opacity:.16; fill:none; }
+      .webGlow { animation: pulse 5s ease-in-out infinite; }
+      @keyframes pulse { 0%,100% { stroke-opacity:.16 } 50% { stroke-opacity:.34 } }
+      .spider { animation: drop 4.5s cubic-bezier(.34,1.3,.64,1) infinite; }
+      @keyframes drop {
+        0% { transform: translateY(-130px) }
+        22% { transform: translateY(8px) }
+        32% { transform: translateY(-5px) }
+        40%, 78% { transform: translateY(0) }
+        100% { transform: translateY(-130px) }
+      }
+      .thread { animation: threadGrow 4.5s ease-out infinite; }
+      @keyframes threadGrow {
+        0% { transform: scaleY(.12) } 22% { transform: scaleY(1.06) }
+        32% { transform: scaleY(.97) } 40%, 78% { transform: scaleY(1) }
+        100% { transform: scaleY(.12) }
+      }
+      .tag { animation: fadeUp 4.5s ease-out infinite; }
+      @keyframes fadeUp {
+        0%, 12% { opacity: 0; transform: translateY(8px) }
+        30%, 88% { opacity: 1; transform: translateY(0) }
+        100% { opacity: 0 }
+      }
+    </style>
+  </defs>
+
+  <rect width="1280" height="300" fill="url(#glow)"/>
+
+  <!-- corner webs -->
+  <g class="web webGlow" stroke-width="1.4">
+    <path d="M0 0L340 0M0 0L330 66M0 0L290 148M0 0L204 232M0 0L96 288M0 0L0 300"/>
+    <path d="M64 0Q60 30 0 48M140 0Q128 66 0 108M226 0Q202 112 0 180M320 6Q282 160 8 262"/>
+  </g>
+  <g class="web webGlow" stroke-width="1.4" transform="translate(1280,0) scale(-1,1)">
+    <path d="M0 0L340 0M0 0L330 66M0 0L290 148M0 0L204 232M0 0L96 288M0 0L0 300"/>
+    <path d="M64 0Q60 30 0 48M140 0Q128 66 0 108M226 0Q202 112 0 180M320 6Q282 160 8 262"/>
+  </g>
+
+  <!-- spider on its thread -->
+  <g transform="translate(1064,0)">
+    <line class="thread" x1="0" y1="0" x2="0" y2="118" stroke="#71717a" stroke-width="1.6" style="transform-origin:0 0"/>
+    <g class="spider">
+      <g transform="translate(0,132)">
+        <ellipse cx="0" cy="10" rx="13" ry="18" fill="#c81e24"/>
+        <circle cx="0" cy="-12" r="9" fill="#c81e24"/>
+        <g stroke="#c81e24" stroke-width="4.5" stroke-linecap="round" fill="none">
+          <path d="M-10 -4 L-30 -16 L-42 -32M-11 3 L-34 1 L-50 -10M-10 11 L-30 19 L-40 36M-8 18 L-20 34 L-22 52"/>
+          <path d="M10 -4 L30 -16 L42 -32M11 3 L34 1 L50 -10M10 11 L30 19 L40 36M8 18 L20 34 L22 52"/>
+        </g>
+        <circle cx="-3.2" cy="-14" r="2" fill="#fff"/>
+        <circle cx="3.2" cy="-14" r="2" fill="#fff"/>
+      </g>
+    </g>
+  </g>
+
+  <text x="120" y="168" font-size="92" font-weight="800" letter-spacing="14" fill="url(#suit)">SPIDEY</text>
+  <text class="tag" x="124" y="212" font-size="21" fill="#a1a1aa" font-style="italic">your friendly neighborhood AI — offline · private · yours</text>
+  <text class="tag" x="124" y="248" font-size="15" fill="#71717a">🎙 “Hey Spidey” voice  ·  🕸 live reasoning web  ·  🧠 Gemma 4 on your machine  ·  🛡 spidey-sense safety</text>
+</svg>
