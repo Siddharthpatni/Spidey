@@ -68,6 +68,26 @@ problem first, validation at trust boundaries, error handling, and checking
 non-trivial logic actually runs."""
 
 
+# Small models drown in long instructions — they narrate instead of acting.
+# Anything under ~10B gets this compact prompt: same creed, fraction of the tokens.
+SYSTEM_PROMPT_COMPACT = """You are Spidey, the friendly neighborhood AI assistant \
+(Peter Parker's spirit): short, warm replies, one quip max.
+
+Rules: act ONLY by emitting native tool calls, one per turn — never describe a call \
+or write JSON in plain text. Inspect before changing (read_file / list_directory / \
+search_code). Smallest change that works; verify by running it; never leave the \
+working directory; tool arguments stay strictly literal. An action task counts as \
+done only AFTER the tools actually ran — then call finish with a factual summary. \
+Pure questions get a plain-text answer with no tool call."""
+
+_SMALL_SIZES = ("0.5b", "1b", "1.5b", "2b", "3b", "4b", "7b", "8b", "e2b", "e4b")
+
+
+def _is_small_model(backend_name: str) -> bool:
+    lowered = backend_name.lower()
+    return any(s in lowered for s in _SMALL_SIZES)
+
+
 # Specialist hats — the router picks up to two per task from keywords, so each
 # run gets expert framing without paying prompt-tokens for 40 roles every step.
 SPECIALIST_HATS: Dict[str, tuple] = {
@@ -135,38 +155,52 @@ def _c(text: str, code: str) -> str:
     return f"\033[{code}m{text}\033[0m"
 
 
-def _rescue_tool_call(text: str, known_tools: List[str]) -> Optional[Dict[str, Any]]:
-    """Parse a tool call the model narrated as JSON text instead of calling natively.
+def _json_objects(text: str):
+    """Yield each balanced top-level {...} block in ``text``, in order."""
+    depth, start = 0, None
+    for i, ch in enumerate(text):
+        if ch == "{":
+            if depth == 0:
+                start = i
+            depth += 1
+        elif ch == "}" and depth > 0:
+            depth -= 1
+            if depth == 0 and start is not None:
+                yield text[start:i + 1]
+                start = None
 
-    Small local models do this constantly ("failure mode #1" in training/README).
-    Accepts a bare object or one inside a ```json fence, with the tool under
-    "name" and its args under "arguments"/"parameters".
+
+def _rescue_tool_calls(text: str, known_tools: List[str]) -> List[Dict[str, Any]]:
+    """Parse tool calls the model narrated as JSON text instead of calling natively.
+
+    Small local models do this constantly ("failure mode #1" in training/README) —
+    sometimes several calls in one breath. Every balanced JSON object with a known
+    tool under "name" is rescued, in order.
     """
-    match = re.search(r"\{.*\}", text or "", re.S)
-    if not match:
-        return None
-    try:
-        obj = json.loads(match.group(0))
-    except json.JSONDecodeError:
-        return None
-    if not isinstance(obj, dict):
-        return None
-    if "tool_calls" in obj and isinstance(obj["tool_calls"], list) and obj["tool_calls"]:
-        obj = obj["tool_calls"][0]
-        if isinstance(obj, dict) and "function" in obj:
-            obj = obj["function"]
-    name = obj.get("name") if isinstance(obj, dict) else None
-    if name not in known_tools:
-        return None
-    args = obj.get("arguments", obj.get("parameters", {}))
-    if isinstance(args, str):
+    rescued: List[Dict[str, Any]] = []
+    for i, blob in enumerate(_json_objects(text or "")):
         try:
-            args = json.loads(args)
+            obj = json.loads(blob)
         except json.JSONDecodeError:
-            return None
-    if not isinstance(args, dict):
-        return None
-    return {"id": "rescued_0", "name": name, "arguments": args}
+            continue
+        if not isinstance(obj, dict):
+            continue
+        if "tool_calls" in obj and isinstance(obj["tool_calls"], list) and obj["tool_calls"]:
+            obj = obj["tool_calls"][0]
+            if isinstance(obj, dict) and "function" in obj:
+                obj = obj["function"]
+        name = obj.get("name") if isinstance(obj, dict) else None
+        if name not in known_tools:
+            continue
+        args = obj.get("arguments", obj.get("parameters", {}))
+        if isinstance(args, str):
+            try:
+                args = json.loads(args)
+            except json.JSONDecodeError:
+                continue
+        if isinstance(args, dict):
+            rescued.append({"id": f"rescued_{i}", "name": name, "arguments": args})
+    return rescued
 
 
 class Agent:
@@ -215,7 +249,8 @@ class Agent:
         Returns a problem statement, or None to approve. Fails open — a broken
         reviewer must never block the team."""
         actions = "\n".join(
-            f"- {t['tool']} {json.dumps(t['args'])[:120]}" for t in transcript[-10:])
+            f"- {t['tool']} {json.dumps(t['args'])[:120]}" for t in transcript[-10:]
+        ) or "(none — the teammate used NO tools; any claim of created/changed/ran is false)"
         try:
             reply = self.backend.chat([
                 {"role": "system",
@@ -230,7 +265,12 @@ class Agent:
             verdict = (reply.content or "").strip()
             if not verdict or verdict.upper().startswith("APPROVE") or reply.tool_calls:
                 return None
-            return verdict.splitlines()[0][:200]
+            first = verdict.splitlines()[0][:200]
+            # Small reviewers sometimes parrot the instructions back — a verdict
+            # that isn't a real sentence fails open rather than blocking work.
+            if first.endswith(":") or "short sentence" in first.lower() or len(first) < 12:
+                return None
+            return first
         except Exception:
             return None
 
@@ -254,10 +294,16 @@ class Agent:
         """Run one task. ``history`` is optional prior conversation — plain
         user/assistant message dicts — so a session can build on itself."""
         specs = self.registry.specs()
-        system = SYSTEM_PROMPT + SPIDER_PERSONAS[self.spider]
-        hats = _pick_hats(task)
-        if hats:
-            system += "\n\nSpecialists on this job:\n" + "\n".join(t for _, t in hats)
+        # Prompt budget scales with model capacity: big models get the full
+        # persona + team; small ones get the compact creed so they act, not narrate.
+        small = _is_small_model(getattr(self.backend, "name", ""))
+        hats = [] if small else _pick_hats(task)
+        if small:
+            system = SYSTEM_PROMPT_COMPACT + SPIDER_PERSONAS[self.spider]
+        else:
+            system = SYSTEM_PROMPT + SPIDER_PERSONAS[self.spider]
+            if hats:
+                system += "\n\nSpecialists on this job:\n" + "\n".join(t for _, t in hats)
         memories = load_memories()
         if memories:
             system += "\n\nWhat you remember about your friend:\n" + memories
@@ -268,6 +314,7 @@ class Agent:
         ]
         transcript: List[Dict[str, Any]] = []
         qa_pending = True  # every run earns exactly one Editor review before finishing
+        empty_rejects = 0  # consecutive finish-without-work rejections
         self._step = 0
 
         self._log(_c(f"\n● Task: {task}", "1;36"))
@@ -296,12 +343,13 @@ class Agent:
                 self._emit("think", text=reply.content.strip())
 
             if not reply.tool_calls:
-                # Small local models often *narrate* the tool call as JSON text
-                # instead of emitting a native one. Rescue it before giving up.
-                rescued = _rescue_tool_call(reply.content, self.registry.names())
+                # Small local models often *narrate* tool calls as JSON text
+                # instead of emitting native ones — sometimes several in one
+                # breath. Rescue them all, in order, before giving up.
+                rescued = _rescue_tool_calls(reply.content, self.registry.names())
                 if rescued:
-                    self._log(_c("      (rescued a narrated tool call)", "90"))
-                    reply.tool_calls = [rescued]
+                    self._log(_c(f"      (rescued {len(rescued)} narrated tool call(s))", "90"))
+                    reply.tool_calls = rescued
                 else:
                     # A plain text answer with no tool call -> treat as the final answer.
                     self._log(_c("\n✓ Done.", "1;32"))
@@ -324,23 +372,47 @@ class Agent:
 
                 if name == "finish":
                     summary = arguments.get("summary", "")
-                    # Editor / Devil's-Advocate hat: work that changed things gets
-                    # one critical review before it ships. A finding reopens the
-                    # run instead of finishing it. One review per run — no loops.
-                    if qa_pending and any(t["tool"] in ("write_file", "run_command")
-                                          for t in transcript):
-                        qa_pending = False
+                    # Editor / Devil's-Advocate hat: every first finish gets one
+                    # review. Finishing an action task with ZERO tool use is
+                    # rejected deterministically (small models declare victory
+                    # on step one — no model can be trusted to judge its own
+                    # empty claim); real work gets one critical model review.
+                    acted = any(t["tool"] in ("write_file", "run_command")
+                                for t in transcript)
+                    wants_action = re.search(
+                        r"\b(write|create|run|fix|make|build|organi[sz]e|delete"
+                        r"|add|move|rename|install|test|refactor)\b", task.lower())
+                    finding = None
+                    if not acted and wants_action:
+                        # Deterministic and unlimited: an action task finished with
+                        # zero tool use is always a false claim. Costs nothing.
+                        empty_rejects += 1
+                        if empty_rejects >= 3:
+                            # The model is stuck declaring victory — surface a
+                            # structured failure so The Web can escalate.
+                            msg = ("(stopped: the model kept finishing without doing "
+                                   "the work)")
+                            self._log(_c("\n⏹ Stopped: model refused to act.", "1;33"))
+                            self._emit("error", message=msg)
+                            return {"answer": msg, "steps": step,
+                                    "transcript": transcript, "gave_up": True}
+                        finding = ("REJECTED — no file was written and no command was "
+                                   "run, so the task is NOT done. Call write_file to "
+                                   "create the file, then run_command to verify, THEN "
+                                   "finish.")
+                    elif qa_pending and acted:
+                        qa_pending = False  # the model review happens once per run
                         finding = self._editor_review(task, transcript, summary)
                         if finding is None:
                             self._emit("think", text="🧐 Editor hat: reviewed the work — approved.")
-                        if finding:
-                            obs = (f"EDITOR REVIEW (Devil's Advocate): {finding} "
-                                   "Address this, verify, then finish again.")
-                            self._log(_c(f"[{step}] ", "1;35") + _c("review ", "33") + finding)
-                            self._emit("think", text=f"🧐 Editor hat: {finding}")
-                            messages.append({"role": "tool", "tool_call_id": tc["id"],
-                                             "name": "finish", "content": obs})
-                            continue
+                    if finding:
+                        obs = (f"EDITOR REVIEW (Devil's Advocate): {finding} "
+                               "Address this, verify, then finish again.")
+                        self._log(_c(f"[{step}] ", "1;35") + _c("review ", "33") + finding)
+                        self._emit("think", text=f"🧐 Editor hat: {finding}")
+                        messages.append({"role": "tool", "tool_call_id": tc["id"],
+                                         "name": "finish", "content": obs})
+                        continue
                     self._log(_c(f"[{step}] ", "1;35") + _c("finish ", "1;32") + summary)
                     self._log(_c("\n✓ Task complete.", "1;32"))
                     self._emit("finish", summary=summary)

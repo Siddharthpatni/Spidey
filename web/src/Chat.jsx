@@ -75,7 +75,9 @@ function ToolLine({ m }) {
 
 function ApprovalCard({ m, active, onAnswer }) {
   return (
-    <div className="rounded-lg border border-amber-500/50 bg-amber-500/10 px-3 py-2">
+    <div className={`rounded-lg border border-amber-500/50 bg-amber-500/10 px-3 py-2 ${
+      m.resolved === null && active ? 'spidey-approval' : ''
+    }`}>
       <div className="mb-1 text-xs font-semibold text-amber-300">⚠ Spidey-sense — approval needed</div>
       <pre className="whitespace-pre-wrap font-mono text-[11px] text-amber-100/90">{m.prompt}</pre>
       {m.resolved === null && active ? (
@@ -169,7 +171,9 @@ export default function Chat({ state, voice, onStart, onStop, onAnswer }) {
           </div>
         )}
         {state.chat.map(m => (
-          <Message key={m.id} m={m} approval={state.approval} onAnswer={onAnswer} />
+          <div key={m.id} className="spidey-msg">
+            <Message m={m} approval={state.approval} onAnswer={onAnswer} />
+          </div>
         ))}
         <div ref={endRef} />
       </div>

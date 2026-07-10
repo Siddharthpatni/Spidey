@@ -42,6 +42,7 @@ from fastapi.staticfiles import StaticFiles
 from ..agent import Agent
 from ..events import AgentEvent
 from ..llm import build_backend
+from ..router import route_task
 from ..safety import SafetyConfig
 from ..voice import VoiceSession, voice_status
 
@@ -95,19 +96,36 @@ class Session:
 
     def run_agent(self, task: str, config: Dict[str, Any]) -> None:
         try:
-            backend = self._build_backend(config)
-            workdir = config.get("workdir") or self.default_workdir
-            agent = Agent(
-                backend,
-                workdir=workdir,
-                safety=SafetyConfig(mode=config.get("safety", "ask")),
-                max_steps=int(config.get("max_steps") or 25),
-                verbose=False,
-                approve=self.approve,
-                on_event=self.on_event,
-                spider=config.get("spider") or "peter",
-            )
-            result = agent.run(task, history=self.history[-12:])
+            # "The Web" auto mode: classify the task and dispatch it to the
+            # Spider (model + personality) that solves it most efficiently.
+            auto = (config.get("spider") == "auto"
+                    and config.get("provider", "ollama") == "ollama")
+            if auto:
+                spider, model, reason = route_task(task)
+                config = {**config, "spider": spider, "model": model}
+                self._push({"type": "think", "step": 0, "text": f"🕸 The Web: {reason}"})
+
+            def _run_with(cfg: Dict[str, Any]) -> Dict[str, Any]:
+                agent = Agent(
+                    self._build_backend(cfg),
+                    workdir=cfg.get("workdir") or self.default_workdir,
+                    safety=SafetyConfig(mode=cfg.get("safety", "ask")),
+                    max_steps=int(cfg.get("max_steps") or 25),
+                    verbose=False,
+                    approve=self.approve,
+                    on_event=self.on_event,
+                    spider=cfg.get("spider") or "peter",
+                )
+                return agent.run(task, history=self.history[-12:])
+
+            result = _run_with(config)
+            # Team escalation: if the dispatched specialist flounders, the
+            # leader takes over — once.
+            if auto and result.get("gave_up") and config.get("spider") != "peter":
+                self._push({"type": "think", "step": 0,
+                            "text": "🕸 The Web: that Spider got stuck — "
+                                    "Peter Parker is taking over."})
+                result = _run_with({**config, "spider": "peter", "model": "gemma4:12b"})
             answer = (result.get("answer") or "").strip()
             if answer and not answer.startswith("(stopped:"):
                 self.history += [{"role": "user", "content": task},

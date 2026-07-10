@@ -35,6 +35,70 @@ body {
 .spidey-header {
   border-bottom: 1px solid transparent;
   border-image: linear-gradient(90deg, var(--spidey-red) 0%, #3f3f46 35%, #3f3f46 65%, var(--spidey-blue) 100%) 1;
+  background: rgba(9, 9, 14, 0.8);
+  backdrop-filter: blur(12px);
+}
+
+/* Messages slide in like a web-line snapping taut. */
+@keyframes spidey-msg-in {
+  from { opacity: 0; transform: translateY(6px) scale(0.99); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+.spidey-msg {
+  animation: spidey-msg-in 0.22s ease-out both;
+}
+
+/* Overlays (settings, history, step sheet) ease in instead of popping. */
+@keyframes spidey-overlay-in {
+  from { opacity: 0; transform: translateY(10px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+.spidey-overlay-in {
+  animation: spidey-overlay-in 0.18s ease-out both;
+}
+@keyframes spidey-slide-right {
+  from { opacity: 0; transform: translateX(-16px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+.spidey-slide-right {
+  animation: spidey-slide-right 0.18s ease-out both;
+}
+@keyframes spidey-slide-left {
+  from { opacity: 0; transform: translateX(16px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+.spidey-slide-left {
+  animation: spidey-slide-left 0.18s ease-out both;
+}
+
+/* Buttons get a gentle lift; inputs a red focus glow. */
+button {
+  transition: transform 0.12s ease, filter 0.12s ease, background-color 0.12s ease,
+              border-color 0.12s ease, box-shadow 0.12s ease;
+}
+button:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+button:active:not(:disabled) {
+  transform: translateY(0);
+}
+textarea:focus,
+input:focus {
+  box-shadow: 0 0 0 3px rgba(200, 30, 36, 0.15);
+}
+
+/* Approval card demands attention without screaming. */
+@keyframes spidey-attention {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.35); }
+  50% { box-shadow: 0 0 14px 2px rgba(245, 158, 11, 0.25); }
+}
+.spidey-approval {
+  animation: spidey-attention 1.6s ease-in-out infinite;
+}
+
+/* iPhone home-indicator breathing room for the tab bar. */
+.spidey-tabbar {
+  padding-bottom: env(safe-area-inset-bottom, 0);
 }
 
 .spidey-bubble-user {

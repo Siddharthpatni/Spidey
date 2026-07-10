@@ -80,7 +80,7 @@ function TokenGate() {
 function StepSheet({ step, onClose }) {
   const s = styleFor(step)
   return (
-    <div className="absolute inset-y-0 right-0 z-40 w-96 max-w-full overflow-y-auto border-l border-zinc-800 bg-zinc-950/95 p-4 backdrop-blur">
+    <div className="spidey-slide-left absolute inset-y-0 right-0 z-40 w-96 max-w-full overflow-y-auto border-l border-zinc-800 bg-zinc-950/95 p-4 backdrop-blur">
       <div className="mb-3 flex items-center justify-between">
         <div className="flex items-center gap-2 font-mono text-sm font-semibold" style={{ color: s.color }}>
           <span>{s.icon}</span>
@@ -297,7 +297,7 @@ export default function App() {
         )}
       </main>
 
-      <nav className="flex border-t border-zinc-800 md:hidden">
+      <nav className="spidey-tabbar flex border-t border-zinc-800 bg-zinc-950/90 backdrop-blur md:hidden">
         {[
           { id: 'chat', label: '💬 Chat' },
           { id: 'web', label: '🕸 Web' },

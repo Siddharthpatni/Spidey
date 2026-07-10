@@ -39,8 +39,9 @@ def _add_run_parser(sub: argparse._SubParsersAction) -> None:
     r.add_argument("--safety", choices=["ask", "enforce", "off"], default="ask",
                    help="ask=prompt on dangerous commands, enforce=block them, off=no checks.")
     r.add_argument("--spider", default="peter",
-                   choices=["peter", "miles", "gwen", "noir", "2099", "ham"],
-                   help="Which Spider answers: peter (default) | miles | gwen | noir | 2099 | ham.")
+                   choices=["auto", "peter", "miles", "gwen", "noir", "2099", "ham"],
+                   help="Which Spider answers — or 'auto' to let The Web dispatch each "
+                        "task to the best-suited Spider/model.")
     r.add_argument("--temp", type=float, default=0.1)
     r.add_argument("--yes", action="store_true",
                    help="Auto-approve command prompts. Convenient but removes the human check.")
@@ -211,23 +212,37 @@ def main(argv: Optional[list] = None) -> int:
             task = Path(args.file).read_text()
         if not task:
             raise SystemExit("Provide a task string or --file.")
-        try:
-            backend = build_backend(args.backend, model=args.model,
+        auto = args.spider == "auto" and args.backend == "ollama"
+        if auto:
+            from .router import route_task
+            args.spider, routed_model, reason = route_task(task)
+            args.model = args.model or routed_model
+            if not args.quiet:
+                print(f"🕸 The Web: {reason}")
+
+        def _run_with(model: str, spider: str):
+            backend = build_backend(args.backend, model=model,
                                     api_key=args.api_key, base_url=args.base_url,
                                     temperature=args.temp)
+            agent = Agent(
+                backend,
+                workdir=args.workdir,
+                safety=SafetyConfig(mode=args.safety),
+                max_steps=args.max_steps,
+                verbose=not args.quiet,
+                approve=(lambda _p: True) if args.yes else None,
+                spider=spider,
+            )
+            return agent.run(task)
+
+        try:
+            result = _run_with(args.model, args.spider)
+            if auto and result.get("gave_up") and args.spider != "peter":
+                if not args.quiet:
+                    print("🕸 The Web: that Spider got stuck — Peter Parker is taking over.")
+                result = _run_with("gemma4:12b", "peter")
         except (ValueError, RuntimeError) as e:
             raise SystemExit(str(e))
-        approve = (lambda _p: True) if args.yes else None
-        agent = Agent(
-            backend,
-            workdir=args.workdir,
-            safety=SafetyConfig(mode=args.safety),
-            max_steps=args.max_steps,
-            verbose=not args.quiet,
-            approve=approve,
-            spider=args.spider,
-        )
-        result = agent.run(task)
         if args.quiet:
             print(result["answer"])
         return 0

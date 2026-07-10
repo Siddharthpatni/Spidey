@@ -12,6 +12,12 @@ export const PROVIDERS = [
 // All free, all open-weight, all fully offline via `ollama pull <tag>`.
 export const SPIDER_VERSE = [
   {
+    tag: '', id: 'auto', spider: 'The Web', emoji: '🕸',
+    title: 'Auto-dispatch', size: 'smart',
+    note: 'Peter leads: every task is classified and sent to the Spider who solves it most efficiently — coding swings to Miles, deep work stays with Peter.',
+    colors: ['#c81e24', '#3b5bdb'],
+  },
+  {
     tag: 'gemma4:12b', id: 'peter', spider: 'Peter Parker', emoji: '🕷️',
     title: 'The Amazing Spider-Man', size: '7.6 GB',
     note: 'The definitive Spidey. Gemma 4 — native tool-calling, the smartest web on your machine.',
@@ -50,7 +56,8 @@ export const SPIDER_VERSE = [
 ]
 
 // Back-compat: plain tag list (datalist for the free-text input).
-export const OLLAMA_MODELS = SPIDER_VERSE.map(s => ({ tag: s.tag, note: `${s.spider} · ${s.size}` }))
+export const OLLAMA_MODELS = SPIDER_VERSE.filter(s => s.tag)
+  .map(s => ({ tag: s.tag, note: `${s.spider} · ${s.size}` }))
 
 export const defaultConfig = {
   provider: 'ollama',
@@ -98,10 +105,10 @@ function SpiderVersePicker({ value, onPick }) {
       </div>
       <div className="grid max-h-64 grid-cols-2 gap-2 overflow-y-auto pr-1">
         {SPIDER_VERSE.map(s => {
-          const active = value === s.tag
+          const active = value === s.id
           return (
             <button
-              key={s.tag}
+              key={s.id}
               type="button"
               onClick={() => onPick(s)}
               className={`rounded-xl border p-2.5 text-left transition-all ${
@@ -158,7 +165,7 @@ export default function Settings({ config, onSave, onClose }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={onClose}>
       <div
-        className="w-full max-w-md space-y-3 rounded-2xl border border-zinc-700 bg-zinc-900 p-5 shadow-2xl"
+        className="spidey-overlay-in w-full max-w-md space-y-3 rounded-2xl border border-zinc-700 bg-zinc-900 p-5 shadow-2xl"
         onClick={e => e.stopPropagation()}
       >
         <div className="flex items-center justify-between">
@@ -180,7 +187,7 @@ export default function Settings({ config, onSave, onClose }) {
 
         {cfg.provider === 'ollama' && (
           <SpiderVersePicker
-            value={cfg.model || provider.model}
+            value={cfg.spider || 'peter'}
             onPick={s => set({ model: s.tag, spider: s.id })}
           />
         )}
