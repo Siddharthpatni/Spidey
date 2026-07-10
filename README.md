@@ -245,6 +245,8 @@ To put it on a small cloud box (Railway, Render, Fly.io) for yourself, use the i
 
 ## Roadmap
 
+- [ ] Knowledge graph over the personal knowledge base (entities + links, like the big assistants)
+- [ ] Closed learning loop: nightly transcripts → preference pairs → adapter fine-tune
 - [ ] Multi-file planning step for larger tasks
 - [ ] More tools (apply-patch/diff editing, container sandbox for `run_command`)
 - [ ] Persistent memory across sessions

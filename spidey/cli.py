@@ -174,6 +174,9 @@ def main(argv: Optional[list] = None) -> int:
     p.add_argument("--voice", action="store_true",
                    help="Also/only download the offline speech model (~40 MB) for "
                         "'Hey Spidey' voice control.")
+    l = sub.add_parser("learn", help="Feed Spidey knowledge: files (.md/.txt) or a text note. "
+                                     "It searches this when you ask about your own world.")
+    l.add_argument("sources", nargs="+", help="File paths, or quoted text to note down.")
     sub.add_parser("version", help="Print the version and exit.")
 
     args = parser.parse_args(argv)
@@ -189,6 +192,12 @@ def main(argv: Optional[list] = None) -> int:
 
     if args.cmd == "up":
         return _cmd_up(args)
+
+    if args.cmd == "learn":
+        from .memory import learn
+        for src in args.sources:
+            print(learn(src))
+        return 0
 
     if args.cmd == "setup":
         if args.voice:

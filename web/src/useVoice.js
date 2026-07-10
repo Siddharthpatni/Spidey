@@ -73,6 +73,7 @@ export function useVoice({ onUtterance }) {
   const [serverStatus, setServerStatus] = useState(null) // /api/voice/status payload
   const [status, setStatus] = useState('off')
   const [partial, setPartial] = useState('')
+  const [heard, setHeard] = useState('') // wake-mode live transcript (diagnostic)
   const [speakReplies, setSpeakReplies] = useState(
     () => localStorage.getItem('spidey-speak') !== '0',
   )
@@ -95,7 +96,8 @@ export function useVoice({ onUtterance }) {
     localStorage.setItem('spidey-speak', speakReplies ? '1' : '0')
   }, [speakReplies])
 
-  const stop = useCallback(() => {
+  const stop = useCallback((forget = true) => {
+    if (forget) localStorage.setItem('spidey-voice-on', '0')
     wsRef.current?.close()
     wsRef.current = null
     streamRef.current?.getTracks().forEach(t => t.stop())
@@ -103,6 +105,7 @@ export function useVoice({ onUtterance }) {
     ctxRef.current?.close().catch(() => {})
     ctxRef.current = null
     setPartial('')
+    setHeard('')
     setStatus('off')
   }, [])
 
@@ -130,7 +133,10 @@ export function useVoice({ onUtterance }) {
         if (ev.type === 'wake') {
           setStatus('awake')
           setPartial('')
+          setHeard('')
           if (ctxRef.current) chime(ctxRef.current)
+        } else if (ev.type === 'heard') {
+          setHeard(ev.text)
         } else if (ev.type === 'partial') {
           setPartial(ev.text)
         } else if (ev.type === 'utterance') {
@@ -159,6 +165,8 @@ export function useVoice({ onUtterance }) {
       await ctx.audioWorklet.addModule(workletUrl)
       URL.revokeObjectURL(workletUrl)
 
+      if (ctx.state === 'suspended') await ctx.resume().catch(() => {})
+
       const source = ctx.createMediaStreamSource(stream)
       const node = new AudioWorkletNode(ctx, 'spidey-capture')
 
@@ -183,12 +191,26 @@ export function useVoice({ onUtterance }) {
         }
       }
       source.connect(node)
+      localStorage.setItem('spidey-voice-on', '1')
       setStatus('listening')
     } catch (err) {
       console.warn('voice start failed:', err)
-      stop()
+      stop(false)
     }
   }, [serverStatus, stop])
+
+  // If voice was on last time and the mic permission is already granted,
+  // re-arm hands-free listening automatically — no click needed per visit.
+  const autoTried = useRef(false)
+  useEffect(() => {
+    if (autoTried.current || !serverStatus?.available) return
+    if (localStorage.getItem('spidey-voice-on') !== '1') return
+    autoTried.current = true
+    navigator.permissions
+      ?.query({ name: 'microphone' })
+      .then(p => p.state === 'granted' && start())
+      .catch(() => {})
+  }, [serverStatus, start])
 
   const toggle = useCallback(() => {
     if (status === 'off') start()
@@ -221,6 +243,7 @@ export function useVoice({ onUtterance }) {
     micSupported: !!navigator.mediaDevices?.getUserMedia,
     status: serverStatus && !serverStatus.available ? 'unavailable' : status,
     partial,
+    heard,
     toggle,
     speak,
     speakReplies,

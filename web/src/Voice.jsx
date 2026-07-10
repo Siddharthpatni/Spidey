@@ -105,7 +105,7 @@ export function SpeakerToggle({ voice }) {
 }
 
 export function VoiceStrip({ voice }) {
-  const { status, partial } = voice
+  const { status, partial, heard } = voice
   if (status !== 'listening' && status !== 'awake') return null
   return (
     <div
@@ -119,8 +119,13 @@ export function VoiceStrip({ voice }) {
       {status === 'awake' ? (
         <span className="truncate">{partial || 'Listening… what can I do?'}</span>
       ) : (
-        <span>
-          Say <span className="font-semibold text-zinc-300">“Hey Spidey”</span> — mic stays on this device
+        <span className="min-w-0 truncate">
+          Say <span className="font-semibold text-zinc-300">“Hey Spidey”</span>
+          {heard ? (
+            <span className="text-zinc-600"> — hearing: “{heard}”</span>
+          ) : (
+            <span className="text-zinc-600"> — mic stays on this device</span>
+          )}
         </span>
       )}
     </div>

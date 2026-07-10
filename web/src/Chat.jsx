@@ -189,7 +189,13 @@ export default function Chat({ state, voice, onStart, onStop, onAnswer }) {
                 submit()
               }
             }}
-            placeholder={state.connected ? 'Describe a task… or say “Hey Spidey”' : 'Connecting…'}
+            placeholder={
+              !state.connected
+                ? 'Connecting…'
+                : voice.status === 'listening' || voice.status === 'awake'
+                  ? 'Listening — say “Hey Spidey…” or type'
+                  : 'Describe a task… (click 🎙 for voice)'
+            }
             rows={2}
             className="flex-1 resize-none rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm outline-none placeholder:text-zinc-600 focus:border-[var(--spidey-red)]"
           />

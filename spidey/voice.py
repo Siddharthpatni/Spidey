@@ -151,6 +151,7 @@ class VoiceSession:
         self.state = "listening" if mode == "wake" else "capturing"
         self._captured_s = 0.0   # audio seconds since capture started
         self._had_speech = False
+        self._last_heard = ""    # last wake-mode partial we told the client about
 
     def set_mode(self, mode: str) -> None:
         self.mode = mode
@@ -172,6 +173,13 @@ class VoiceSession:
         partial = (json.loads(self.rec.PartialResult()).get("partial") or "").strip()
 
         if self.state == "listening":
+            # Tell the client what the recognizer hears while waiting for the
+            # wake word — the difference between "broken" and "it heard
+            # 'hey sweetie'" is everything when debugging a mic.
+            heard_now = partial or (final_text or "")
+            if heard_now != self._last_heard:
+                self._last_heard = heard_now
+                events.append({"type": "heard", "text": heard_now[-60:]})
             heard = (final_text and _heard_wake(final_text)) or _heard_wake(partial)
             if heard:
                 # If the command rode in on the same breath, keep its tail.

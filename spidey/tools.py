@@ -171,6 +171,11 @@ def _remember(ctx: Context, args: Dict[str, Any]) -> str:
     return add_memory(args["fact"])
 
 
+def _search_notes(ctx: Context, args: Dict[str, Any]) -> str:
+    from .memory import search_knowledge
+    return search_knowledge(args["query"])
+
+
 def _finish(ctx: Context, args: Dict[str, Any]) -> str:
     # The agent intercepts calls to `finish` by name; this is only a fallback.
     return args.get("summary", "")
@@ -241,6 +246,16 @@ def default_registry() -> ToolRegistry:
                                                 "'Siddharth prefers short answers.'"}},
          "required": ["fact"]},
         _remember,
+    ))
+    reg.register(Tool(
+        "search_notes",
+        "Search the user's personal knowledge base — documents they fed Spidey "
+        "(`spidey learn <file>`), remembered facts, and lessons from past jobs. Use it "
+        "when a question is about THEIR life, projects, or notes rather than this folder.",
+        {"type": "object",
+         "properties": {"query": {"type": "string", "description": "A few key words."}},
+         "required": ["query"]},
+        _search_notes,
     ))
     reg.register(Tool(
         "finish",

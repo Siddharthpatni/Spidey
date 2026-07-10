@@ -16,7 +16,7 @@ from typing import Any, Callable, Dict, List, Optional
 
 from .events import AgentEvent, EventHandler
 from .llm import LLMBackend
-from .memory import load_memories
+from .memory import add_lesson, load_lessons, load_memories
 from .safety import SafetyConfig
 from .tools import Context, ToolRegistry, default_registry
 
@@ -307,6 +307,9 @@ class Agent:
         memories = load_memories()
         if memories:
             system += "\n\nWhat you remember about your friend:\n" + memories
+        lessons = load_lessons()
+        if lessons:
+            system += "\n\nLessons your past mistakes taught you:\n" + lessons
         messages: List[Dict[str, Any]] = [
             {"role": "system", "content": system},
             *(history or []),
@@ -405,6 +408,9 @@ class Agent:
                         finding = self._editor_review(task, transcript, summary)
                         if finding is None:
                             self._emit("think", text="🧐 Editor hat: reviewed the work — approved.")
+                        else:
+                            # Self-learning: corrections become standing lessons.
+                            add_lesson(f"On '{task[:60]}…': {finding}")
                     if finding:
                         obs = (f"EDITOR REVIEW (Devil's Advocate): {finding} "
                                "Address this, verify, then finish again.")
