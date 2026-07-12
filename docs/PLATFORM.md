@@ -3,10 +3,11 @@
 Eleven production-style capability modules on one shared core. Everything below is
 served by the same process as the agent (`spidey serve` / `spidey up`) — REST under
 `/api/*`, interactive OpenAPI docs at **`/docs`**, Prometheus metrics at **`/metrics`**,
-and the **interactive playground at `/platform`**: every module has a working
-*Try it* form, plus live stat tiles, the job queue, the LLM call trace and a ⌘K
-command palette. If you're new here, start at `/platform` — you can drive every
-feature below with buttons before ever writing a curl command.
+and the **Spider-Verse Studio at `/platform`**: a React single-page app (same
+bundle as the agent chat, a Spider-Verse boot screen, a responsive sidebar of AI
+tools that swap in place, back/reload buttons, and a cross-device session picker).
+If you're new here, start at `/platform` — you can drive every feature below with
+buttons before ever writing a curl command.
 
 ```
                           ┌───────────────────────────────┐

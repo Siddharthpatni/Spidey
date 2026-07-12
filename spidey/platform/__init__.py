@@ -62,6 +62,13 @@ def mount_platform(app: Any) -> None:
 
     @app.get("/platform", response_class=HTMLResponse, include_in_schema=False)
     async def dashboard() -> str:
+        # Prefer the React Studio (same bundle as the agent chat). If the web app
+        # isn't built, fall back to the self-contained HTML dashboard so the
+        # platform UI still works from a bare `pip install`.
+        from pathlib import Path
+        index = Path(__file__).resolve().parent.parent / "server" / "static" / "index.html"
+        if index.is_file():
+            return index.read_text()
         return DASHBOARD_HTML
 
     @app.on_event("startup")
