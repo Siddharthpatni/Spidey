@@ -99,7 +99,7 @@ def test_auth_flow(client):
 
 def test_health_and_metrics(client):
     health = client.get("/api/health").json()
-    assert health["status"] == "ok" and len(health["modules"]) == 14
+    assert health["status"] == "ok" and len(health["modules"]) == 15
     metrics = client.get("/metrics").text
     assert "spidey_uptime_seconds" in metrics
 

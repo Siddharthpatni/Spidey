@@ -110,3 +110,17 @@ def test_resume_upload_extracts_skills(client):
     r = client.put("/api/match/resumes/upload?name=jane.txt", content=content).json()
     assert "python" in r["skills"] and "kubernetes" in r["skills"]
     assert r["chars"] > 0
+
+
+# ------------------------------- media studio -------------------------------- #
+def test_media_status_is_honest(client):
+    st = client.get("/api/media/status").json()
+    assert "image" in st and "url" in st["image"]
+    assert "Ollama" in st["note"]  # honest note that Ollama ≠ image gen
+
+
+def test_media_image_without_backend_explains_how(client):
+    # No Stable Diffusion running in CI → 501 with install instructions, not a crash.
+    r = client.post("/api/media/image", json={"prompt": "a red spider"})
+    assert r.status_code == 501
+    assert "Stable Diffusion" in r.json()["detail"]

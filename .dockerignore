@@ -1,9 +1,23 @@
+# Keep the image lean AND safe — never copy secrets or reference projects in.
+LOGICS/
+.git
 .venv
+venv
 web/node_modules
+web/dist
 **/__pycache__
 *.egg-info
+*.pyc
 outputs
 outputs-dpo
 spidey-brain
 spidey-brain-dpo
-.git
+*.gguf
+*.safetensors
+*.db
+*.db-wal
+*.db-shm
+.env
+.DS_Store
+workspace/
+scratchpad/

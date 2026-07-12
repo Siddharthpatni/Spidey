@@ -157,6 +157,20 @@ const STD_TOOLS = [
     ],
   },
   {
+    id: 'media', sec: 'Create', ico: '🎨', name: 'Media Studio',
+    desc: 'Generate images from a prompt using a local Stable Diffusion backend. (Ollama runs text only — install AUTOMATIC1111/ComfyUI with --api for images; audio/video backends wire in the same way.) Press Check backends to see what\'s available.',
+    fields: [{ key: 'prompt', type: 'textarea', label: 'Image prompt', placeholder: 'e.g. a spider-web city skyline at dusk, cinematic, highly detailed' }],
+    rows: [[
+      { key: 'w', type: 'select', label: 'Width', options: ['512', '768', '1024'] },
+      { key: 'h', type: 'select', label: 'Height', options: ['512', '768', '1024'] },
+      { key: 'negative_prompt', type: 'text', flex: 2, label: 'Avoid (optional)', placeholder: 'blurry, low quality' },
+    ]],
+    actions: [
+      { label: 'Generate image', render: (d) => <div><b>{d.title}</b> · {(d.size / 1024).toFixed(0)} KB<div><a className="dl" href={d.download_url}>⬇ Download image</a></div><div style={{ marginTop: '.6rem' }}><img src={d.download_url} alt="" style={{ maxWidth: '100%', borderRadius: 10, border: '1px solid var(--line)' }} /></div></div>, run: (v) => api('POST', '/api/media/image', { prompt: v.prompt || '', negative_prompt: v.negative_prompt || '', width: +(v.w || 512), height: +(v.h || 512) }) },
+      { label: 'Check backends', ghost: true, run: () => api('GET', '/api/media/status') },
+    ],
+  },
+  {
     id: 'code', sec: 'Engineer', ico: '💻', name: 'Code Assistant',
     desc: 'Paste code to hunt bugs (AST analysis) or generate pytest tests.',
     fields: [{ key: 'code', type: 'textarea', label: 'Code', style: { fontFamily: 'ui-monospace,monospace' }, placeholder: 'Paste Python…' }],
@@ -281,30 +295,125 @@ function TeamTool({ log }) {
   </>)
 }
 
+/* Live force-directed "neural network" of the knowledge graph, on a canvas:
+   nodes repel, edges pull, signals pulse along connections like firing synapses.
+   Polls the API so new nodes animate in as the graph learns. */
+function NeuralGraph({ version }) {
+  const canvasRef = useRef(null)
+  const sim = useRef({ nodes: new Map(), edges: [], pulses: [], adj: new Map() })
+  const raf = useRef(0)
+
+  const load = async () => {
+    try {
+      const g = await api('GET', '/api/brain/graph')
+      const S = sim.current
+      const seen = new Set()
+      const maxW = Math.max(1, ...g.nodes.map((n) => n.weight))
+      g.nodes.forEach((n) => {
+        seen.add(n.id)
+        const cv = canvasRef.current
+        const W = (cv && cv.clientWidth) || 800, H = (cv && cv.clientHeight) || 420
+        if (!S.nodes.has(n.id)) S.nodes.set(n.id, { ...n, x: W / 2 + (Math.random() - 0.5) * 120, y: H / 2 + (Math.random() - 0.5) * 120, vx: 0, vy: 0, born: performance.now() })
+        else Object.assign(S.nodes.get(n.id), { weight: n.weight, name: n.name, type: n.type })
+        S.nodes.get(n.id).r = 4 + Math.min(18, (n.weight / maxW) * 18)
+      })
+      for (const id of [...S.nodes.keys()]) if (!seen.has(id)) S.nodes.delete(id)
+      S.edges = g.edges.filter((e) => S.nodes.has(e.src) && S.nodes.has(e.dst))
+      S.adj = new Map()
+      S.edges.forEach((e) => { S.adj.set(e.src, [...(S.adj.get(e.src) || []), e.dst]); S.adj.set(e.dst, [...(S.adj.get(e.dst) || []), e.src]) })
+    } catch { /* offline */ }
+  }
+  useEffect(() => { load() }, [version]) // eslint-disable-line
+  useEffect(() => {
+    const iv = setInterval(load, 5000)
+    const cv = canvasRef.current
+    const ctx = cv.getContext('2d')
+    const fit = () => { const d = window.devicePixelRatio || 1; cv.width = cv.clientWidth * d; cv.height = cv.clientHeight * d; ctx.setTransform(d, 0, 0, d, 0, 0) }
+    fit(); window.addEventListener('resize', fit)
+
+    const step = () => {
+      const S = sim.current
+      const W = cv.clientWidth, H = cv.clientHeight
+      const arr = [...S.nodes.values()]
+      // forces: repulsion (all pairs), spring (edges), gravity to center
+      for (let i = 0; i < arr.length; i++) {
+        const a = arr[i]
+        for (let j = i + 1; j < arr.length; j++) {
+          const b = arr[j]
+          let dx = a.x - b.x, dy = a.y - b.y; let d2 = dx * dx + dy * dy || 0.01
+          const f = 900 / d2; const d = Math.sqrt(d2)
+          const ux = dx / d, uy = dy / d
+          a.vx += ux * f; a.vy += uy * f; b.vx -= ux * f; b.vy -= uy * f
+        }
+        a.vx += (W / 2 - a.x) * 0.0016; a.vy += (H / 2 - a.y) * 0.0016
+      }
+      const byId = S.nodes
+      S.edges.forEach((e) => {
+        const a = byId.get(e.src), b = byId.get(e.dst); if (!a || !b) return
+        let dx = b.x - a.x, dy = b.y - a.y; const d = Math.sqrt(dx * dx + dy * dy) || 0.01
+        const target = 90; const f = (d - target) * 0.006
+        const ux = dx / d, uy = dy / d
+        a.vx += ux * f; a.vy += uy * f; b.vx -= ux * f; b.vy -= uy * f
+      })
+      arr.forEach((n) => { n.vx *= 0.86; n.vy *= 0.86; n.x += n.vx; n.y += n.vy; n.x = Math.max(n.r, Math.min(W - n.r, n.x)); n.y = Math.max(n.r, Math.min(H - n.r, n.y)) })
+
+      // spawn signal pulses along random edges (synapses firing)
+      if (S.edges.length && Math.random() < 0.25 && S.pulses.length < 40) {
+        const e = S.edges[Math.floor(Math.random() * S.edges.length)]
+        S.pulses.push({ src: e.src, dst: e.dst, t: 0 })
+      }
+      S.pulses = S.pulses.filter((p) => { p.t += 0.02; if (p.t >= 1) { // arrive → sometimes fire onward
+        if (Math.random() < 0.5) { const nb = (S.adj.get(p.dst) || []); if (nb.length) S.pulses.push({ src: p.dst, dst: nb[Math.floor(Math.random() * nb.length)], t: 0 }) }
+        return false } return true })
+
+      // ---- draw ----
+      ctx.clearRect(0, 0, W, H)
+      // edges
+      ctx.lineWidth = 1
+      S.edges.forEach((e) => { const a = byId.get(e.src), b = byId.get(e.dst); if (!a || !b) return; ctx.strokeStyle = 'rgba(120,120,140,0.14)'; ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke() })
+      // pulses
+      S.pulses.forEach((p) => { const a = byId.get(p.src), b = byId.get(p.dst); if (!a || !b) return; const x = a.x + (b.x - a.x) * p.t, y = a.y + (b.y - a.y) * p.t; ctx.beginPath(); ctx.arc(x, y, 2.6, 0, 7); ctx.fillStyle = '#ef3a40'; ctx.shadowColor = '#ef3a40'; ctx.shadowBlur = 12; ctx.fill(); ctx.shadowBlur = 0 })
+      // nodes
+      const now = performance.now()
+      arr.forEach((n) => {
+        const col = TYPE_COLORS[n.type] || '#8a8a92'
+        const grow = Math.min(1, (now - n.born) / 500)
+        const r = n.r * grow
+        ctx.beginPath(); ctx.arc(n.x, n.y, r, 0, 7)
+        ctx.fillStyle = col; ctx.shadowColor = col; ctx.shadowBlur = 10 + r; ctx.globalAlpha = 0.9; ctx.fill()
+        ctx.globalAlpha = 1; ctx.shadowBlur = 0
+        if (r > 8) { ctx.fillStyle = 'rgba(240,240,245,0.92)'; ctx.font = '11px ui-sans-serif,system-ui'; ctx.fillText(n.name.slice(0, 20), n.x + r + 3, n.y + 4) }
+      })
+      if (!arr.length) { ctx.fillStyle = '#8a8a92'; ctx.font = '13px ui-sans-serif'; ctx.fillText('Graph is empty — index a repo, add a doc, or type a concept below and press "Learn it".', 16, 28) }
+      raf.current = requestAnimationFrame(step)
+    }
+    raf.current = requestAnimationFrame(step)
+    return () => { cancelAnimationFrame(raf.current); clearInterval(iv); window.removeEventListener('resize', fit) }
+  }, []) // eslint-disable-line
+  return <canvas ref={canvasRef} className="bn-svg" />
+}
+
 function BrainTool({ log }) {
   const [a, setA] = useState(''); const [b, setB] = useState(''); const [text, setText] = useState('')
-  const [g, setG] = useState({ nodes: [], edges: [] }); const [st, setSt] = useState(null)
-  const [out, setOut] = useState(null); const [busy, setBusy] = useState(null)
-  const svgRef = useRef(null)
-  const refresh = async () => {
-    try { const [gg, ss] = await Promise.all([api('GET', '/api/brain/graph'), api('GET', '/api/brain/stats')]); setG(gg); setSt(ss) }
-    catch (e) { setOut(<span className="bad">{e.message}</span>) }
-  }
-  useEffect(() => { refresh() }, [])
+  const [st, setSt] = useState(null); const [out, setOut] = useState(null); const [busy, setBusy] = useState(null)
+  const [version, setVersion] = useState(0)
+  const refreshStats = async () => { try { setSt(await api('GET', '/api/brain/stats')) } catch { /* offline */ } }
+  useEffect(() => { refreshStats(); const iv = setInterval(refreshStats, 5000); return () => clearInterval(iv) }, [])
   const act = async (name, fn, render) => {
     setBusy(name)
-    try { const r = await fn(); setOut(render ? render(r) : <pre style={{ whiteSpace: 'pre-wrap', margin: 0 }}>{pretty(r)}</pre>); await refresh() }
+    try { const r = await fn(); setOut(render ? render(r) : <pre style={{ whiteSpace: 'pre-wrap', margin: 0 }}>{pretty(r)}</pre>); refreshStats(); setVersion((v) => v + 1) }
     catch (e) { setOut(<span className="bad">✗ {e.message}</span>) }
     setBusy(null)
   }
-  const svg = svgRef.current
-  const W = (svg && svg.clientWidth) || 900, H = (svg && svg.clientHeight) || 420
-  const nodes = g.nodes || []; const idx = {}; nodes.forEach((n, i) => { idx[n.id] = i })
-  const maxW = Math.max(1, ...nodes.map((n) => n.weight))
-  const cx = W / 2, cy = H / 2, R = Math.min(W, H) / 2 - 50
-  const pos = nodes.map((n, i) => { const ang = (i / nodes.length) * 2 * Math.PI; const r = R * (0.35 + 0.65 * (1 - n.weight / maxW)); return { x: cx + r * Math.cos(ang), y: cy + r * Math.sin(ang) } })
   return (<>
-    <div className="card">
+    {st && <div className="stats">
+      {[[st.nodes, 'neurons'], [st.edges, 'synapses'], [(st.by_type[0] || {}).type || '—', 'biggest type'], [(st.top_concepts[0] || {}).name || '—', 'top concept']].map(([v, l], i) => <div className="stat" key={i}><b>{v}</b><span>{l}</span></div>)}
+    </div>}
+    <div className="card" style={{ padding: '.4rem' }}>
+      <NeuralGraph version={version} />
+      <div style={{ margin: '.5rem .3rem 0' }}>{Object.entries(TYPE_COLORS).map(([t, c]) => <span className="chip" key={t} style={{ borderColor: c }}><span style={{ color: c }}>●</span> {t}</span>)}</div>
+    </div>
+    <div className="card" style={{ marginTop: '1rem' }}>
       <div className="row"><input style={{ flex: 3 }} value={text} onChange={(e) => setText(e.target.value)} placeholder="Teach the graph: paste text / notes / a concept…" />
         <button disabled={!!busy} onClick={() => act('learn', () => api('POST', '/api/brain/ingest', { text, source: 'studio' }))}>Learn it</button>
         <button className="ghost" disabled={!!busy} onClick={() => act('sync', () => api('POST', '/api/brain/sync-memory'))}>Sync my memory</button></div>
@@ -312,16 +421,6 @@ function BrainTool({ log }) {
         <input value={a} onChange={(e) => setA(e.target.value)} placeholder="Concept A (e.g. ROS2)" />
         <input value={b} onChange={(e) => setB(e.target.value)} placeholder="Concept B (e.g. YOLO)" />
         <button className="ghost" disabled={!!busy} onClick={() => act('path', () => api('GET', `/api/brain/path?from_=${encodeURIComponent(a)}&to=${encodeURIComponent(b)}`), (r) => r.found ? <div><b className="ok">Connected in {r.hops} hops:</b>{'\n'}{r.path.map((p) => p.via ? `  →(${p.via})→ ${p.name}` : p.name).join('\n')}</div> : <span className="warn">{r.reason || 'no path'}</span>)}>Find connection</button></div>
-    </div>
-    {st && <div className="stats" style={{ marginTop: '1rem' }}>
-      {[[st.nodes, 'nodes'], [st.edges, 'connections'], [(st.by_type[0] || {}).type || '—', 'biggest type'], [(st.top_concepts[0] || {}).name || '—', 'top concept']].map(([v, l], i) => <div className="stat" key={i}><b>{v}</b><span>{l}</span></div>)}
-    </div>}
-    <div className="card"><svg ref={svgRef} className="bn-svg">
-      {nodes.length === 0 && <text x="20" y="30" fill="#8a8a99">Graph is empty — index a repo, add a doc, or type a concept above and press "Learn it".</text>}
-      {(g.edges || []).map((e, i) => { const p = pos[idx[e.src]], q = pos[idx[e.dst]]; return (p && q) ? <line key={i} x1={p.x} y1={p.y} x2={q.x} y2={q.y} stroke="#2a2a38" strokeWidth={Math.min(3, e.weight)} /> : null })}
-      {nodes.map((n, i) => { const p = pos[i]; const rad = 6 + Math.min(16, n.weight * 1.5); const col = TYPE_COLORS[n.type] || '#8a8a99'; return (<g key={n.id}><circle cx={p.x} cy={p.y} r={rad} fill={col} fillOpacity="0.85" stroke="#0b0b10" strokeWidth="1.5"><title>{n.name} ({n.type}, w={n.weight.toFixed(1)})</title></circle>{(n.weight > maxW * 0.45 || i % 2 === 0) && <text x={p.x + rad + 2} y={p.y + 4} fill="#e9e9f0" fontSize="11">{n.name.slice(0, 22)}</text>}</g>) })}
-    </svg>
-      <div style={{ marginTop: '.5rem' }}>{Object.entries(TYPE_COLORS).map(([t, c]) => <span className="chip" key={t} style={{ borderColor: c }}><span style={{ color: c }}>●</span> {t}</span>)}</div>
     </div>
     {out && <div className="out">{out}</div>}
   </>)
@@ -370,6 +469,7 @@ const ALL = [
   EXTRA_TOOLS.find((t) => t.id === 'home'),
   STD_TOOLS.find((t) => t.id === 'docstudio'),
   EXTRA_TOOLS.find((t) => t.id === 'paper'),
+  STD_TOOLS.find((t) => t.id === 'media'),
   STD_TOOLS.find((t) => t.id === 'llm'),
   STD_TOOLS.find((t) => t.id === 'scrape'),
   STD_TOOLS.find((t) => t.id === 'research'),

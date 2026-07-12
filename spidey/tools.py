@@ -270,6 +270,27 @@ def _http_request(ctx: Context, args: Dict[str, Any]) -> str:
             + ("\n...[truncated]" if len(resp.text) > 6000 else ""))
 
 
+def _generate_image(ctx: Context, args: Dict[str, Any]) -> str:
+    """Generate an image from a text prompt via a local Stable Diffusion backend."""
+    from .platform.modules.media import ImageIn, generate_image
+    from fastapi import HTTPException
+
+    prompt = args.get("prompt", "")
+    if not prompt.strip():
+        return "ERROR: 'prompt' is required"
+    try:
+        img = generate_image(ImageIn(prompt=prompt, negative_prompt=args.get("negative_prompt", ""),
+                                     width=int(args.get("width", 512)),
+                                     height=int(args.get("height", 512)),
+                                     title=args.get("title", "")))
+    except HTTPException as e:
+        return f"IMAGE BACKEND UNAVAILABLE: {e.detail}"
+    except Exception as e:
+        return f"ERROR generating image: {type(e).__name__}: {e}"
+    return (f"Generated image '{img['title']}' ({img['size']} bytes). "
+            f"Download at {img['download_url']}.")
+
+
 def _create_document(ctx: Context, args: Dict[str, Any]) -> str:
     """Generate a real downloadable document (résumé, CV, slides, report, HTML
     canvas...) via the platform's Document Studio."""
@@ -427,6 +448,20 @@ def default_registry() -> ToolRegistry:
                                     "JSON) or a string (sent raw)."}},
          "required": ["url"]},
         _http_request,
+    ))
+    reg.register(Tool(
+        "generate_image",
+        "Generate an image from a text prompt (uses a local Stable Diffusion backend). "
+        "Use when the user asks for a picture, illustration, logo, or artwork. Returns a "
+        "download link; if no image backend is installed, it says exactly how to add one.",
+        {"type": "object",
+         "properties": {
+            "prompt": {"type": "string", "description": "What to draw, in detail."},
+            "negative_prompt": {"type": "string", "description": "What to avoid (optional)."},
+            "width": {"type": "integer"}, "height": {"type": "integer"},
+            "title": {"type": "string"}},
+         "required": ["prompt"]},
+        _generate_image,
     ))
     reg.register(Tool(
         "create_document",

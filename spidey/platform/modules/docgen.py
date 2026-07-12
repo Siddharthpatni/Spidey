@@ -446,7 +446,10 @@ MEDIA_TYPES = {
     "md": "text/markdown", "txt": "text/plain", "html": "text/html",
     "docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
     "pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-    "pdf": "application/pdf"}
+    "pdf": "application/pdf",
+    # generated media (Media Studio) reuse the same download endpoint
+    "png": "image/png", "jpg": "image/jpeg", "webp": "image/webp",
+    "mp3": "audio/mpeg", "wav": "audio/wav", "mp4": "video/mp4"}
 
 
 # ------------------------------ generation ----------------------------------- #

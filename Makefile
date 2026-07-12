@@ -19,6 +19,15 @@ setup:              ## Download an open-weight model for fully offline use
 serve:              ## Start the web UI (chat + live reasoning web)
 	spidey serve --port $(PORT)
 
+sandbox:            ## Run Spidey boxed in Docker — only ./workspace is reachable, host data is safe
+	@command -v openssl >/dev/null && export SPIDEY_TOKEN=$${SPIDEY_TOKEN:-$$(openssl rand -hex 16)}; \
+	echo "▶ Sandbox token: $$SPIDEY_TOKEN"; \
+	echo "▶ Open  http://localhost:8000/?token=$$SPIDEY_TOKEN  once it's up"; \
+	SPIDEY_TOKEN=$$SPIDEY_TOKEN docker compose up --build
+
+sandbox-down:       ## Stop the sandbox (data in the spidey-home volume is kept)
+	docker compose down
+
 run:                ## Run a task: make run TASK="..." MODEL=...
 	spidey run "$(TASK)" --model $(MODEL)
 

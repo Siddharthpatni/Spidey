@@ -29,14 +29,14 @@ def mount_platform(app: Any) -> None:
     from .dashboard import DASHBOARD_HTML
     from .modules import (analytics, brain, codeassist, docgen, driving,
                           email_assistant, filepipe, fleet, jobs, llmgateway,
-                          research, sessions, team, webauto)
+                          media, research, sessions, team, webauto)
 
     db.init()
 
     guarded = [Depends(auth.require_api_key)]
     for mod in (webauto, filepipe, analytics, fleet, jobs, research,
                 codeassist, email_assistant, driving, team, llmgateway,
-                docgen, sessions, brain):
+                docgen, sessions, brain, media):
         app.include_router(mod.router, dependencies=guarded)
         register = getattr(mod, "register_jobs", None)
         if register:
@@ -51,7 +51,7 @@ def mount_platform(app: Any) -> None:
             "status": "ok",
             "modules": ["webauto", "files", "analytics", "fleet", "jobs",
                         "research", "code", "email", "driving", "team", "llm",
-                        "docgen", "sessions", "brain"],
+                        "docgen", "sessions", "brain", "media"],
             "queue": default_queue().stats(),
             "optional": _optional_features(),
         }
@@ -93,4 +93,12 @@ def _optional_features() -> dict:
             feats[feat] = True
         except Exception:
             feats[feat] = False
+    # Image generation is a reachable local service, not a Python import.
+    try:
+        import os
+        import requests
+        sd = os.environ.get("SPIDEY_SD_URL", "http://localhost:7860").rstrip("/")
+        feats["image_gen"] = requests.get(f"{sd}/sdapi/v1/sd-models", timeout=1).ok
+    except Exception:
+        feats["image_gen"] = False
     return feats

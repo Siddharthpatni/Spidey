@@ -25,6 +25,12 @@ wandb/
 # Reference projects copied in for logic-mining — contain .env secrets, never commit
 LOGICS/
 
+# Sandbox workspace: the folder exists (README/.gitkeep) but its contents are the
+# agent's scratch space and Docker volume mount — don't track them.
+workspace/*
+!workspace/README.md
+!workspace/.gitkeep
+
 # Frontend
 web/node_modules/
 spidey-brain-dpo/
