@@ -6,12 +6,15 @@ The point (and the interview talking point) is that these checks live *outside*
 the model's context: a poisoned prompt or a confused model cannot edit the policy.
 
 Modes:
-  * "ask"     (default) dangerous commands require a human y/N; everything else runs.
+  * "off"     (default) no checks — the agent runs shell commands without asking.
+              This is the owner's-machine default: maximum autonomy, no approval prompts.
+  * "ask"               dangerous commands require a human y/N; everything else runs.
   * "enforce"           dangerous commands are blocked outright (good for CI / unattended).
-  * "off"               no checks (don't use this on a machine you care about).
 
-File tools (read/write) are separately confined to the working directory via
-``within_workdir`` so the agent can't read your SSH keys or write to /etc.
+File access: by default the agent can read and write anywhere on disk (full-disk
+mode). Set ``confine_to_workdir=True`` to lock file tools inside the working
+directory (blocks reading ~/.ssh or writing /etc) — the safer choice for a shared
+or exposed instance.
 """
 
 from __future__ import annotations
@@ -43,9 +46,10 @@ DANGEROUS: List[Tuple[str, str]] = [
 
 @dataclass
 class SafetyConfig:
-    mode: str = "ask"                 # "ask" | "enforce" | "off"
+    mode: str = "off"                 # "off" (default) | "ask" | "enforce"
     command_timeout: int = 60         # seconds before a command is killed
     extra_deny: List[str] = field(default_factory=list)  # additional regex rules
+    confine_to_workdir: bool = False  # True = lock file tools inside the working dir
 
 
 def check_command(cmd: str, cfg: SafetyConfig) -> Tuple[str, str]:

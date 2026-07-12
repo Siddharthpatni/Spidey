@@ -19,6 +19,14 @@ from .safety import SafetyConfig, check_command, within_workdir
 MAX_OUTPUT = 8000  # cap observation size so a huge file doesn't blow up the context
 
 
+def _path_allowed(ctx: "Context", path: Path) -> bool:
+    """Full-disk by default; only enforce the workdir sandbox when the safety
+    config asks for it (``confine_to_workdir=True``)."""
+    if not getattr(ctx.safety, "confine_to_workdir", False):
+        return True
+    return within_workdir(ctx.workdir, path)
+
+
 @dataclass
 class Context:
     """Runtime handles passed to every tool call."""
@@ -77,8 +85,8 @@ def _truncate(text: Any) -> str:
 def _read_file(ctx: Context, args: Dict[str, Any]) -> str:
     rel = args["path"]
     path = (ctx.workdir / rel)
-    if not within_workdir(ctx.workdir, path):
-        return f"ERROR: refusing to read outside the working directory: {rel}"
+    if not _path_allowed(ctx, path):
+        return f"ERROR: file access blocked by confine_to_workdir: {rel}"
     if not path.exists():
         return f"ERROR: file not found: {rel}"
     if path.is_dir():
@@ -90,8 +98,8 @@ def _write_file(ctx: Context, args: Dict[str, Any]) -> str:
     rel = args["path"]
     content = args.get("content", "")
     path = (ctx.workdir / rel)
-    if not within_workdir(ctx.workdir, path):
-        return f"ERROR: refusing to write outside the working directory: {rel}"
+    if not _path_allowed(ctx, path):
+        return f"ERROR: file access blocked by confine_to_workdir: {rel}"
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(content)
     return f"Wrote {len(content)} bytes to {rel}"
@@ -100,8 +108,8 @@ def _write_file(ctx: Context, args: Dict[str, Any]) -> str:
 def _list_directory(ctx: Context, args: Dict[str, Any]) -> str:
     rel = args.get("path", ".")
     path = (ctx.workdir / rel)
-    if not within_workdir(ctx.workdir, path):
-        return f"ERROR: refusing to list outside the working directory: {rel}"
+    if not _path_allowed(ctx, path):
+        return f"ERROR: listing blocked by confine_to_workdir: {rel}"
     if not path.exists():
         return f"ERROR: not found: {rel}"
     rows = []
@@ -114,8 +122,8 @@ def _search_code(ctx: Context, args: Dict[str, Any]) -> str:
     pattern = args["pattern"]
     rel = args.get("path", ".")
     root = (ctx.workdir / rel)
-    if not within_workdir(ctx.workdir, root):
-        return f"ERROR: refusing to search outside the working directory: {rel}"
+    if not _path_allowed(ctx, root):
+        return f"ERROR: search blocked by confine_to_workdir: {rel}"
     try:
         rx = re.compile(pattern)
     except re.error as e:
@@ -230,6 +238,36 @@ def _team_status(ctx: Context, args: Dict[str, Any]) -> str:
     lines = ["queue: " + (", ".join(f"{k}={v}" for k, v in stats.items()) or "empty")]
     lines += [f"alert[{a['source']}]: {a['message']}" for a in alerts] or ["no active alerts"]
     return "\n".join(lines)
+
+
+def _http_request(ctx: Context, args: Dict[str, Any]) -> str:
+    """Call any HTTP API: GET/POST/PUT/PATCH/DELETE with optional headers + body."""
+    import json as _json
+
+    import requests
+
+    method = (args.get("method") or "GET").upper()
+    url = args["url"]
+    if not url.startswith(("http://", "https://")):
+        return "ERROR: url must start with http:// or https://"
+    headers = args.get("headers") or {}
+    if isinstance(headers, str):
+        headers = _json.loads(headers) if headers.strip() else {}
+    body = args.get("body")
+    kwargs: Dict[str, Any] = {"headers": headers, "timeout": 30}
+    if body is not None:
+        if isinstance(body, (dict, list)):
+            kwargs["json"] = body
+        else:
+            kwargs["data"] = body
+    try:
+        resp = requests.request(method, url, **kwargs)
+    except Exception as e:
+        return f"ERROR calling {url}: {type(e).__name__}: {e}"
+    ct = resp.headers.get("content-type", "")
+    preview = resp.text[:6000]
+    return (f"{method} {url} -> {resp.status_code} ({ct})\n{preview}"
+            + ("\n...[truncated]" if len(resp.text) > 6000 else ""))
 
 
 def _create_document(ctx: Context, args: Dict[str, Any]) -> str:
@@ -374,6 +412,21 @@ def default_registry() -> ToolRegistry:
         "(analytics thresholds, fleet maintenance). Use when asked how the system is doing.",
         {"type": "object", "properties": {}},
         _team_status,
+    ))
+    reg.register(Tool(
+        "http_request",
+        "Make an HTTP request to any API or URL and return the response. Use for "
+        "calling REST APIs, webhooks, downloading JSON/text, or checking a service. "
+        "Supports GET/POST/PUT/PATCH/DELETE with headers and a JSON or text body.",
+        {"type": "object",
+         "properties": {
+            "url": {"type": "string", "description": "Full http(s) URL."},
+            "method": {"type": "string", "description": "GET (default), POST, PUT, PATCH, DELETE."},
+            "headers": {"type": "object", "description": "Optional request headers."},
+            "body": {"description": "Optional request body — a JSON object/array (sent as "
+                                    "JSON) or a string (sent raw)."}},
+         "required": ["url"]},
+        _http_request,
     ))
     reg.register(Tool(
         "create_document",

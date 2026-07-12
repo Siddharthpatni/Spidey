@@ -109,7 +109,8 @@ class Session:
                 agent = Agent(
                     self._build_backend(cfg),
                     workdir=cfg.get("workdir") or self.default_workdir,
-                    safety=SafetyConfig(mode=cfg.get("safety", "ask")),
+                    safety=SafetyConfig(mode=cfg.get("safety", "off"),
+                                        confine_to_workdir=bool(cfg.get("confine_to_workdir", False))),
                     max_steps=int(cfg.get("max_steps") or 25),
                     verbose=False,
                     approve=self.approve,

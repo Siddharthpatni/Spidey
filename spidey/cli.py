@@ -36,8 +36,11 @@ def _add_run_parser(sub: argparse._SubParsersAction) -> None:
                         "OPENAI_API_KEY for the matching provider.")
     r.add_argument("--workdir", default=".", help="Directory the agent operates in. Default: .")
     r.add_argument("--max-steps", type=int, default=25)
-    r.add_argument("--safety", choices=["ask", "enforce", "off"], default="ask",
-                   help="ask=prompt on dangerous commands, enforce=block them, off=no checks.")
+    r.add_argument("--safety", choices=["ask", "enforce", "off"], default="off",
+                   help="off (default)=run commands without asking; ask=prompt on dangerous "
+                        "commands; enforce=block them.")
+    r.add_argument("--confine-to-workdir", action="store_true",
+                   help="Lock file tools inside --workdir (default: full-disk access).")
     r.add_argument("--spider", default="peter",
                    choices=["auto", "peter", "miles", "gwen", "noir", "2099", "ham"],
                    help="Which Spider answers — or 'auto' to let The Web dispatch each "
@@ -312,7 +315,8 @@ def main(argv: Optional[list] = None) -> int:
             agent = Agent(
                 backend,
                 workdir=args.workdir,
-                safety=SafetyConfig(mode=args.safety),
+                safety=SafetyConfig(mode=args.safety,
+                                    confine_to_workdir=getattr(args, "confine_to_workdir", False)),
                 max_steps=args.max_steps,
                 verbose=not args.quiet,
                 approve=(lambda _p: True) if args.yes else None,
