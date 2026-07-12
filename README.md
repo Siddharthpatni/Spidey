@@ -142,16 +142,18 @@ flowchart TD
 
 The agent keeps an OpenAI-style message history, hands the model JSON-schema tools, and loops: **model picks a tool → safety layer checks it → tool runs → result goes back to the model** until it calls `finish`. Every provider quirk lives in a backend ([spidey/llm.py](spidey/llm.py)); every dangerous action lives behind the safety layer ([spidey/safety.py](spidey/safety.py)); every step is emitted as a structured event ([spidey/events.py](spidey/events.py)) that the web UI renders live. The core loop ([spidey/agent.py](spidey/agent.py)) stays deliberately small and readable.
 
-## 🕸 The Platform — eleven products, one web
+## 🕸 The Platform — a Spider-Verse AI Studio
 
-The same server that hosts the agent ships a **capability platform**: eleven
+The same server that hosts the agent ships a **capability platform**: fourteen
 production-style modules on one shared core (SQLite + migrations, a retrying job
 queue, a scheduler, API-key auth, Prometheus metrics, webhooks, an offline vector
-store, and a traced LLM bridge). REST under `/api/*`, live OpenAPI docs at
-**`/docs`**, metrics at **`/metrics`** — and an **interactive playground at
-`/platform`**: every module has a *Try it* form (scrape a URL, upload a file, match
-a resume, run the agent team…) plus live stat tiles, the job queue, the LLM call
-trace, and a **⌘K command palette**. No curl needed.
+store, a **self-building knowledge graph**, and a traced LLM bridge). REST under
+`/api/*`, live OpenAPI docs at **`/docs`**, metrics at **`/metrics`** — and a
+full **Spider-Verse Studio at `/platform`**: a single-page app (matching the agent
+chat's suit-red/blue theme, spider-web background and animations) with a sidebar of
+AI tools that swap in place — no page reloads, back/reload buttons, and a session
+picker so your work follows you to any device on the network. Generate a document,
+write an IEEE paper, watch the knowledge graph grow — all with buttons, no curl.
 
 | Module | What it does |
 |---|---|
@@ -166,6 +168,10 @@ trace, and a **⌘K command palette**. No curl needed.
 | ✉️ **Email Assistant** | IMAP sync (credentials never stored), auto-categorize, priority, smart replies, ICS suggestions, mail RAG |
 | 🚗 **Driving Data** | drive-log replay, **TTC collision prediction**, behavior reports; OpenCV lane + pedestrian detection |
 | 🤝 **Multi-Agent Team** | Planner → Researcher → Coder → Reviewer → Tester → Docs, with shared memory, on the job queue |
+| 📝 **Document Studio** | generate a résumé, CV, cover letter, **slide deck (PPTX)**, report, letter, README or proposal → download as **.docx / .pptx / .pdf / .html / .md / .txt** (pure-Python writers, no Office/LaTeX needed) |
+| 🔬 **Research Papers** | give a topic → fetch **real references** (Crossref + Wikipedia) → write a full **IEEE-format paper** section by section, live |
+| 🧠 **Knowledge Graph** | every doc, repo, resume and remembered fact becomes connected nodes (concept · tool · framework · project · person) — the AI reasons over **relationships**, and it **builds itself** as you use the platform |
+| 🗂 **Sessions** | every action is saved to the DB and shared across **all devices on your network** — pick up where you left off from any browser |
 
 Everything runs on the **standard library + requests** — optional extras
 (`pip install -e ".[scrape,pdf,ocr,vision,embeddings]"`) unlock Playwright

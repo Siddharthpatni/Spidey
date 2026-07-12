@@ -11,9 +11,10 @@ reachable and a solid static generator when not.
 from __future__ import annotations
 
 import re
+from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
 from ..core import db, llmutil
@@ -133,7 +134,45 @@ def add_resume(body: ResumeIn) -> dict:
     rid = db.execute(
         "INSERT INTO resumes(name, text, skills, vec, created_at) VALUES(?,?,?,?,?)",
         (body.name, text, db.json_dumps(skills), db.json_dumps(embed(text)), db.now()))
+    _graph_skills("You", skills)
     return {"id": rid, "name": body.name, "skills": skills}
+
+
+def _graph_skills(person: str, skills: List[str]) -> None:
+    """Connect a person to their skills in the knowledge graph."""
+    try:
+        from ..core import graph
+        pid = graph.upsert_node("person", person)
+        for s in skills:
+            sid = graph.upsert_node(graph.TECH_TYPES.get(s, "skill"), s, bump=0.5)
+            graph.link(pid, sid, "has_skill", 1.0)
+    except Exception:
+        pass
+
+
+@router.put("/resumes/upload")
+async def upload_resume(request: Request, name: str = "resume.txt") -> dict:
+    """Raw-body resume upload (PDF/DOCX/TXT): text is extracted server-side,
+    skills recognized, embedding stored — same as posting text."""
+    body = await request.body()
+    if not body:
+        raise HTTPException(422, "empty body — send the file as the request body")
+    safe = Path(name).name or "resume.txt"
+    dest = db.data_dir() / "resumes"
+    dest.mkdir(exist_ok=True)
+    path = dest / safe
+    path.write_bytes(body)
+    try:
+        text = extract_text(str(path))
+    except RuntimeError as e:
+        raise HTTPException(422, str(e))
+    if not text.strip():
+        raise HTTPException(422, f"no extractable text in {safe}")
+    skills = extract_skills(text)
+    rid = db.execute(
+        "INSERT INTO resumes(name, text, skills, vec, created_at) VALUES(?,?,?,?,?)",
+        (Path(safe).stem, text, db.json_dumps(skills), db.json_dumps(embed(text)), db.now()))
+    return {"id": rid, "name": Path(safe).stem, "skills": skills, "chars": len(text)}
 
 
 @router.get("/resumes")

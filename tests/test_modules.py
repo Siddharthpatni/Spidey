@@ -280,7 +280,8 @@ def test_dashboard_and_openapi(client):
             for t in op.get("tags", [])}
     assert {"Web Automation", "File Pipeline", "Analytics", "Fleet", "Job Matching",
             "Research", "Code Assistant", "Email Assistant", "Driving Data",
-            "Multi-Agent Team", "LLM Gateway", "Queue", "Scheduler", "Auth"} <= tags
+            "Multi-Agent Team", "LLM Gateway", "Documents", "Sessions",
+            "Queue", "Scheduler", "Auth"} <= tags
 
 
 # ------------------- LOGICS ports: gateway, writers, analyzer ------------------- #

@@ -11,9 +11,10 @@ module works offline.
 from __future__ import annotations
 
 import re
+from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
 from ..core import db, llmutil
@@ -40,6 +41,13 @@ def ingest(title: str, text: str, kind: str, source: str = "") -> int:
             "INSERT INTO doc_chunks(doc_id, seq, text, vec) VALUES(?,?,?,?)",
             [(doc_id, i, c, db.json_dumps(embed(c)))
              for i, c in enumerate(chunk_text(text))])
+    # Fold the document into the knowledge graph (self-building brain).
+    try:
+        from ..core import graph
+        graph.ingest_text(text[:8000], source=f"doc:{title}",
+                          central=("paper", title), rel="covers")
+    except Exception:
+        pass
     return doc_id
 
 
@@ -128,6 +136,29 @@ def add_doc(body: DocIn) -> dict:
     doc_id = ingest(body.title, text, kind, source)
     n = db.one("SELECT COUNT(*) AS n FROM doc_chunks WHERE doc_id=?", (doc_id,))["n"]
     return {"id": doc_id, "title": body.title, "chunks": n}
+
+
+@router.put("/docs/upload")
+async def upload_doc(request: Request, title: str = "") -> dict:
+    """Raw-body document upload (PDF/DOCX/HTML/TXT/MD): the file is saved, its
+    text extracted, chunked and embedded — ready for /ask, /summary, /analyze."""
+    body = await request.body()
+    if not body:
+        raise HTTPException(422, "empty body — send the file as the request body")
+    name = Path(title).name or "upload.txt"
+    dest = db.data_dir() / "research"
+    dest.mkdir(exist_ok=True)
+    path = dest / name
+    path.write_bytes(body)
+    try:
+        text = extract_text(str(path))
+    except RuntimeError as e:
+        raise HTTPException(422, str(e))
+    if not text.strip():
+        raise HTTPException(422, f"no extractable text in {name}")
+    doc_id = ingest(Path(name).stem, text, "file", str(path))
+    n = db.one("SELECT COUNT(*) AS n FROM doc_chunks WHERE doc_id=?", (doc_id,))["n"]
+    return {"id": doc_id, "title": Path(name).stem, "chunks": n, "chars": len(text)}
 
 
 @router.get("/docs")

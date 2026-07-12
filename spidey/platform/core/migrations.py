@@ -131,4 +131,51 @@ MIGRATIONS = [
         ts TEXT NOT NULL);
     CREATE INDEX idx_llm_calls_ts ON llm_calls(ts);
     """),
+
+    (3, """
+    -- workspaces: every action in the studio is recorded and restorable ---------
+    CREATE TABLE sessions(
+        id INTEGER PRIMARY KEY, name TEXT NOT NULL,
+        created_at TEXT NOT NULL, last_active_at TEXT NOT NULL);
+    CREATE TABLE session_items(
+        id INTEGER PRIMARY KEY, session_id INTEGER NOT NULL REFERENCES sessions(id),
+        module TEXT NOT NULL, action TEXT NOT NULL,
+        input TEXT, output TEXT, ref_id INTEGER,      -- e.g. generated doc id
+        ts TEXT NOT NULL);
+    CREATE INDEX idx_session_items ON session_items(session_id, id);
+
+    -- document studio: AI-generated files in every format ------------------------
+    CREATE TABLE generated_docs(
+        id INTEGER PRIMARY KEY, kind TEXT NOT NULL, title TEXT NOT NULL,
+        format TEXT NOT NULL, path TEXT NOT NULL, size INTEGER NOT NULL,
+        prompt TEXT, markdown TEXT, mode TEXT,        -- llm | template | render
+        created_at TEXT NOT NULL);
+
+    -- deep-research papers: long jobs with visible per-section progress ----------
+    CREATE TABLE paper_runs(
+        id INTEGER PRIMARY KEY, topic TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'queued',        -- queued|researching|writing|done|failed
+        progress TEXT,                                -- json: stage + sections done
+        sources TEXT,                                 -- json: fetched references
+        doc_id INTEGER REFERENCES generated_docs(id),
+        error TEXT, created_at TEXT NOT NULL, finished_at TEXT);
+    """),
+
+    (4, """
+    -- the knowledge graph: everything Spidey learns becomes connected -----------
+    CREATE TABLE kg_nodes(
+        id INTEGER PRIMARY KEY, type TEXT NOT NULL, name TEXT NOT NULL,
+        props TEXT, weight REAL NOT NULL DEFAULT 1,
+        created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
+        UNIQUE(type, name));
+    CREATE INDEX idx_kg_nodes_name ON kg_nodes(name);
+    CREATE TABLE kg_edges(
+        id INTEGER PRIMARY KEY,
+        src INTEGER NOT NULL REFERENCES kg_nodes(id),
+        dst INTEGER NOT NULL REFERENCES kg_nodes(id),
+        rel TEXT NOT NULL DEFAULT 'related_to', weight REAL NOT NULL DEFAULT 1,
+        created_at TEXT NOT NULL, UNIQUE(src, dst, rel));
+    CREATE INDEX idx_kg_edges_src ON kg_edges(src);
+    CREATE INDEX idx_kg_edges_dst ON kg_edges(dst);
+    """),
 ]

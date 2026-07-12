@@ -168,7 +168,15 @@ def _plan(ctx: Context, args: Dict[str, Any]) -> str:
 
 def _remember(ctx: Context, args: Dict[str, Any]) -> str:
     from .memory import add_memory
-    return add_memory(args["fact"])
+    result = add_memory(args["fact"])
+    # Mirror the fact into the knowledge graph so remembered things connect to
+    # everything else Spidey knows (the self-building brain).
+    try:
+        from .platform.modules.brain import learn_fact
+        learn_fact(args["fact"])
+    except Exception:
+        pass
+    return result
 
 
 def _search_notes(ctx: Context, args: Dict[str, Any]) -> str:
@@ -222,6 +230,31 @@ def _team_status(ctx: Context, args: Dict[str, Any]) -> str:
     lines = ["queue: " + (", ".join(f"{k}={v}" for k, v in stats.items()) or "empty")]
     lines += [f"alert[{a['source']}]: {a['message']}" for a in alerts] or ["no active alerts"]
     return "\n".join(lines)
+
+
+def _create_document(ctx: Context, args: Dict[str, Any]) -> str:
+    """Generate a real downloadable document (résumé, CV, slides, report, HTML
+    canvas...) via the platform's Document Studio."""
+    from .platform.modules.docgen import KINDS, FORMATS, create_document
+
+    kind = args.get("kind", "custom")
+    fmt = args.get("format", "docx")
+    if kind not in KINDS:
+        return f"ERROR: kind must be one of {list(KINDS)}"
+    if fmt not in FORMATS:
+        return f"ERROR: format must be one of {FORMATS}"
+    prompt = args.get("prompt") or args.get("brief") or ""
+    if not prompt.strip():
+        return "ERROR: 'prompt' (what the document should contain) is required"
+    try:
+        doc = create_document(kind, fmt, args.get("title", "").strip() or KINDS[kind]["label"],
+                              prompt, args.get("details", ""))
+    except Exception as e:
+        return f"ERROR generating document: {type(e).__name__}: {e}"
+    return (f"Created '{doc['title']}' ({doc['format'].upper()}, {doc['size']} bytes, "
+            f"{doc['mode']} mode). Download it at {doc['download_url']} "
+            f"(open http://localhost:8000{doc['download_url']} in the browser, or find it "
+            f"under History in the Studio).")
 
 
 def _finish(ctx: Context, args: Dict[str, Any]) -> str:
@@ -341,6 +374,31 @@ def default_registry() -> ToolRegistry:
         "(analytics thresholds, fleet maintenance). Use when asked how the system is doing.",
         {"type": "object", "properties": {}},
         _team_status,
+    ))
+    reg.register(Tool(
+        "create_document",
+        "Generate a real, downloadable document and return its link. Use whenever the "
+        "user wants a résumé, CV, cover letter, slide deck / presentation (PPT), report, "
+        "letter, README, proposal, or a visual HTML 'canvas' — instead of pasting a long "
+        "document into chat.",
+        {"type": "object",
+         "properties": {
+            "kind": {"type": "string",
+                     "description": "resume | cv | cover_letter | presentation | report | "
+                                    "letter | readme | proposal | meeting_minutes | "
+                                    "ieee_paper | custom"},
+            "format": {"type": "string",
+                       "description": "docx | pptx | pdf | html | md | txt. Use pptx for "
+                                      "slide decks, html for a visual canvas, docx/pdf for "
+                                      "résumés and reports."},
+            "title": {"type": "string"},
+            "prompt": {"type": "string",
+                       "description": "What the document should contain, in detail."},
+            "details": {"type": "string",
+                        "description": "Optional source facts to use verbatim (the user's "
+                                       "real experience, data, notes) — never invented."}},
+         "required": ["kind", "format", "prompt"]},
+        _create_document,
     ))
     reg.register(Tool(
         "finish",

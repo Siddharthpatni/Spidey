@@ -27,14 +27,16 @@ def mount_platform(app: Any) -> None:
     from .core import auth, db, metrics, queue, scheduler
     from .core.queue import default_queue
     from .dashboard import DASHBOARD_HTML
-    from .modules import (analytics, codeassist, driving, email_assistant,
-                          filepipe, fleet, jobs, llmgateway, research, team, webauto)
+    from .modules import (analytics, brain, codeassist, docgen, driving,
+                          email_assistant, filepipe, fleet, jobs, llmgateway,
+                          research, sessions, team, webauto)
 
     db.init()
 
     guarded = [Depends(auth.require_api_key)]
     for mod in (webauto, filepipe, analytics, fleet, jobs, research,
-                codeassist, email_assistant, driving, team, llmgateway):
+                codeassist, email_assistant, driving, team, llmgateway,
+                docgen, sessions, brain):
         app.include_router(mod.router, dependencies=guarded)
         register = getattr(mod, "register_jobs", None)
         if register:
@@ -48,7 +50,8 @@ def mount_platform(app: Any) -> None:
         return {
             "status": "ok",
             "modules": ["webauto", "files", "analytics", "fleet", "jobs",
-                        "research", "code", "email", "driving", "team", "llm"],
+                        "research", "code", "email", "driving", "team", "llm",
+                        "docgen", "sessions", "brain"],
             "queue": default_queue().stats(),
             "optional": _optional_features(),
         }

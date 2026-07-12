@@ -11,11 +11,13 @@ from spidey.platform.core.text import (chunk_text, cosine, embed,
 
 def test_migrations_applied(isolated_db):
     versions = [r["version"] for r in db.query("SELECT version FROM schema_migrations")]
-    assert versions == [1, 2]
+    assert versions == [1, 2, 3, 4]
     tables = {r["name"] for r in db.query(
         "SELECT name FROM sqlite_master WHERE type='table'")}
     assert {"jobs", "schedules", "events", "vehicles", "resumes", "docs",
-            "repo_chunks", "emails", "drive_sessions", "team_runs"} <= tables
+            "repo_chunks", "emails", "drive_sessions", "team_runs",
+            "llm_calls", "sessions", "generated_docs", "paper_runs",
+            "kg_nodes", "kg_edges"} <= tables
 
 
 def test_embed_cosine_ranking():
@@ -97,7 +99,7 @@ def test_auth_flow(client):
 
 def test_health_and_metrics(client):
     health = client.get("/api/health").json()
-    assert health["status"] == "ok" and len(health["modules"]) == 11
+    assert health["status"] == "ok" and len(health["modules"]) == 14
     metrics = client.get("/metrics").text
     assert "spidey_uptime_seconds" in metrics
 

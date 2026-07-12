@@ -77,6 +77,17 @@ def index_repo(root: Path) -> Dict[str, Any]:
     with db.connect() as conn:
         conn.executemany("INSERT INTO repo_chunks(repo, path, start_line, text, vec)"
                          " VALUES(?,?,?,?,?)", rows)
+    # Fold the repo into the knowledge graph: the project node links to the
+    # languages/frameworks/tools its files mention.
+    try:
+        from ..core import graph
+        proj = root.name
+        pid = graph.upsert_node("project", proj, {"path": repo}, bump=1.0)
+        sample = "\n".join(t for _, _, _, t, _ in rows[:60])
+        for typ, name in graph.extract_entities(sample):
+            graph.link(pid, graph.upsert_node(typ, name, bump=0.5), "uses", 1.0)
+    except Exception:
+        pass
     return {"repo": repo, "files": files, "chunks": chunks}
 
 
