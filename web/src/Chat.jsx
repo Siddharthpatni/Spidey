@@ -160,10 +160,27 @@ export default function Chat({ state, voice, onStart, onStop, onAnswer }) {
     <div className="spidey-web-bg flex h-full flex-col">
       <div className="flex-1 space-y-2 overflow-y-auto p-3">
         {state.chat.length === 0 && (
-          <div className="mt-10 space-y-2 text-center text-sm text-zinc-500">
+          <div className="mt-8 space-y-3 text-center text-sm text-zinc-500">
             <div className="text-3xl">🕷️</div>
             <p className="font-semibold text-zinc-400">Your friendly neighborhood AI.</p>
             <p>Type a task — or turn on the mic and say “Hey Spidey”.</p>
+            <div className="mx-auto flex max-w-xs flex-wrap justify-center gap-1.5 pt-1">
+              {[
+                ['📂', 'Organize the files in this folder by type'],
+                ['📝', "Create a note in my Notes app titled 'Ideas' "],
+                ['⏰', "Add a reminder called 'drink water' to my Reminders"],
+                ['💻', 'Find and explain the biggest file in this folder'],
+                ['🧠', 'What do you remember about me?'],
+              ].map(([icon, prompt]) => (
+                <button
+                  key={prompt}
+                  onClick={() => state.connected && onStart(prompt)}
+                  className="rounded-full border border-zinc-700 px-2.5 py-1 text-xs text-zinc-400 hover:border-[var(--spidey-red)] hover:text-zinc-200"
+                >
+                  {icon} {prompt.length > 30 ? prompt.slice(0, 30) + '…' : prompt}
+                </button>
+              ))}
+            </div>
             <p className="text-xs text-zinc-600">
               No model yet? Run <code className="text-zinc-400">spidey setup</code> once, or pick a
               provider in <span className="font-semibold text-zinc-400">⚙ Settings</span>.

@@ -107,6 +107,75 @@ def _cmd_up(args) -> int:
                  token=args.token, https=args.https)
 
 
+def _cmd_app(args) -> int:
+    """Turn Spidey into a PC app on macOS: the server starts at login and stays
+    running in the background (LaunchAgent), and a Spidey.app lands in
+    ~/Applications — click it and the UI opens like any other program."""
+    import platform
+    import plistlib
+    import subprocess
+    import sys as _sys
+
+    if platform.system() != "Darwin":
+        print("`spidey app` is macOS-only for now. On other systems, autostart "
+              "`spidey up --no-open` with your init system and pin the PWA.")
+        return 1
+
+    spidey_bin = Path(_sys.argv[0]).resolve()
+    url = f"http://127.0.0.1:{args.port}/"
+
+    # 1. LaunchAgent: the server is always there, like any system service.
+    agents = Path.home() / "Library" / "LaunchAgents"
+    agents.mkdir(parents=True, exist_ok=True)
+    plist_path = agents / "dev.spidey.server.plist"
+    plist = {
+        "Label": "dev.spidey.server",
+        "ProgramArguments": [str(spidey_bin), "up", "--no-open",
+                             "--port", str(args.port), "--workdir", str(Path.home())],
+        "RunAtLoad": True,
+        "KeepAlive": True,
+        # launchd gives services a bare PATH — Ollama lives in Homebrew's bin.
+        "EnvironmentVariables": {
+            "PATH": "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin"},
+        "StandardOutPath": str(Path.home() / ".spidey" / "server.log"),
+        "StandardErrorPath": str(Path.home() / ".spidey" / "server.log"),
+    }
+    with open(plist_path, "wb") as f:
+        plistlib.dump(plist, f)
+    subprocess.run(["launchctl", "unload", str(plist_path)],
+                   capture_output=True)
+    subprocess.run(["launchctl", "load", str(plist_path)], check=True)
+
+    # 2. A clickable app: opens the UI in the default browser.
+    apps_dir = Path.home() / "Applications"
+    apps_dir.mkdir(exist_ok=True)
+    app_path = apps_dir / "Spidey.app"
+    subprocess.run(
+        ["osacompile", "-o", str(app_path), "-e", f'do shell script "open {url}"'],
+        check=True, capture_output=True)
+
+    print("🕷  Spidey is now a PC app:")
+    print(f"  • server runs at login, always on  →  {url}")
+    print(f"  • {app_path}  — open it from Launchpad/Spotlight like any app")
+    print("  • tip: open the URL once and 'Add to Dock' (File menu in Safari/Chrome)")
+    print(f"  • logs: ~/.spidey/server.log   · uninstall: spidey app --remove")
+    return 0
+
+
+def _cmd_app_remove(args) -> int:
+    import subprocess
+
+    plist_path = Path.home() / "Library" / "LaunchAgents" / "dev.spidey.server.plist"
+    subprocess.run(["launchctl", "unload", str(plist_path)], capture_output=True)
+    plist_path.unlink(missing_ok=True)
+    app = Path.home() / "Applications" / "Spidey.app"
+    if app.exists():
+        import shutil
+        shutil.rmtree(app)
+    print("Removed the login service and Spidey.app.")
+    return 0
+
+
 def _cmd_setup_voice() -> int:
     """Download the offline speech model so 'Hey Spidey' works without internet."""
     from . import voice
@@ -174,6 +243,10 @@ def main(argv: Optional[list] = None) -> int:
     p.add_argument("--voice", action="store_true",
                    help="Also/only download the offline speech model (~40 MB) for "
                         "'Hey Spidey' voice control.")
+    a = sub.add_parser("app", help="macOS: run Spidey at login + put Spidey.app in "
+                                   "~/Applications — use it like a PC app, no terminal.")
+    a.add_argument("--port", type=int, default=8001)
+    a.add_argument("--remove", action="store_true", help="Uninstall the login service and app.")
     l = sub.add_parser("learn", help="Feed Spidey knowledge: files (.md/.txt) or a text note. "
                                      "It searches this when you ask about your own world.")
     l.add_argument("sources", nargs="+", help="File paths, or quoted text to note down.")
@@ -192,6 +265,9 @@ def main(argv: Optional[list] = None) -> int:
 
     if args.cmd == "up":
         return _cmd_up(args)
+
+    if args.cmd == "app":
+        return _cmd_app_remove(args) if args.remove else _cmd_app(args)
 
     if args.cmd == "learn":
         from .memory import learn

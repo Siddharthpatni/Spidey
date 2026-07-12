@@ -22,6 +22,9 @@ wandb/
 .idea/
 .vscode/
 
+# Reference projects copied in for logic-mining — contain .env secrets, never commit
+LOGICS/
+
 # Frontend
 web/node_modules/
 spidey-brain-dpo/

@@ -142,6 +142,64 @@ flowchart TD
 
 The agent keeps an OpenAI-style message history, hands the model JSON-schema tools, and loops: **model picks a tool → safety layer checks it → tool runs → result goes back to the model** until it calls `finish`. Every provider quirk lives in a backend ([spidey/llm.py](spidey/llm.py)); every dangerous action lives behind the safety layer ([spidey/safety.py](spidey/safety.py)); every step is emitted as a structured event ([spidey/events.py](spidey/events.py)) that the web UI renders live. The core loop ([spidey/agent.py](spidey/agent.py)) stays deliberately small and readable.
 
+## 🕸 The Platform — eleven products, one web
+
+The same server that hosts the agent ships a **capability platform**: eleven
+production-style modules on one shared core (SQLite + migrations, a retrying job
+queue, a scheduler, API-key auth, Prometheus metrics, webhooks, an offline vector
+store, and a traced LLM bridge). REST under `/api/*`, live OpenAPI docs at
+**`/docs`**, metrics at **`/metrics`** — and an **interactive playground at
+`/platform`**: every module has a *Try it* form (scrape a URL, upload a file, match
+a resume, run the agent team…) plus live stat tiles, the job queue, the LLM call
+trace, and a **⌘K command palette**. No curl needed.
+
+| Module | What it does |
+|---|---|
+| 🕷 **Web Automation** | scrape any site — structured/tables/links/text strategies, **AI fallback** to JSON, OCR, screenshots, retries, schedules, and a human **approval queue** |
+| 🤖 **LLM Gateway** | one traced endpoint for any provider — every call logged with latency + token & **cost estimates** (local models = $0); stats per model |
+| 📁 **File Pipeline** | upload → queue → workers → typed processing (CSV profiling, zip, images, PDF) → webhook notify |
+| 📈 **Analytics** | event ingestion → minute rollups → percentiles/timeseries → **alert rules** → webhooks (mini-Datadog) |
+| 🚚 **Fleet** | vehicle tracking, fuel + maintenance prediction, harsh-driving events, anomaly detection, route optimizer |
+| 🎯 **Job Matching** | resume → embedding → ranked matches → skill gap → roadmap → interview questions → **ATS report, tailored résumé & cover-letter writer** |
+| 📚 **Research** | ingest papers/PDFs → RAG Q&A with citations, summaries, flashcards, compare — plus a **document analyzer** (deadlines incl. German formats, amounts, contacts, requirements) |
+| 💻 **Code Assistant** | index a repo → chat with it, AST bug hunting, PR review, pytest generation, Mermaid architecture diagrams |
+| ✉️ **Email Assistant** | IMAP sync (credentials never stored), auto-categorize, priority, smart replies, ICS suggestions, mail RAG |
+| 🚗 **Driving Data** | drive-log replay, **TTC collision prediction**, behavior reports; OpenCV lane + pedestrian detection |
+| 🤝 **Multi-Agent Team** | Planner → Researcher → Coder → Reviewer → Tester → Docs, with shared memory, on the job queue |
+
+Everything runs on the **standard library + requests** — optional extras
+(`pip install -e ".[scrape,pdf,ocr,vision,embeddings]"`) unlock Playwright
+rendering, OCR, OpenCV and real embeddings, and **every AI feature degrades to a
+deterministic fallback** when no model is running, so the whole platform works
+offline. The agent joined the party too: new `scrape_page` and `platform_status`
+tools let it pull live web data and check the system mid-task.
+Full reference: [docs/PLATFORM.md](docs/PLATFORM.md).
+
+## 🛠 Software engineering, shown not told
+
+This repo is also a working demonstration of production practice:
+
+- **Tests that mean something** — [tests/](tests/) drives the core *and all eleven
+  modules through the real API* (queue retries, auth lockout, approval flows,
+  collision math), fully offline, in CI on every push.
+- **CI/CD** — [GitHub Actions](.github/workflows/ci.yml): compile, boot, data
+  generators, the pytest suite, and the frontend build.
+- **Versioned DB migrations** — append-only, recorded in `schema_migrations`
+  ([migrations.py](spidey/platform/core/migrations.py)) — Alembic's model, sized for SQLite.
+- **AuthN done right** — API keys stored as SHA-256 hashes, shown once, revocable;
+  token-gated WebSockets; secrets never written to disk.
+- **Observability** — Prometheus `/metrics`, structured event log, and per-call LLM
+  tracing (latency, tokens, cost) you can chart in Grafana.
+- **Resilience** — every background job gets exponential-backoff retries and a
+  dead-letter state with one-click re-queue; webhooks fire on completion/failure.
+- **API discipline** — typed request models, honest status codes (401/404/409/422/501/502),
+  self-documenting OpenAPI with tagged modules.
+- **Graceful degradation** — heavy dependencies optional, AI features fall back to
+  deterministic algorithms; `GET /api/health` reports exactly what's unlocked.
+- **Security posture** — command screening + path confinement for the agent, human
+  approval queues for outbound scrapes, TLS self-provisioning for LAN use
+  ([docs/SECURITY.md](docs/SECURITY.md)).
+
 ## CLI
 
 ```bash
@@ -206,9 +264,13 @@ Spidey/
 │   ├── tools.py       #   read, write, list, search, run, finish
 │   ├── safety.py      #   command screening + path confinement
 │   ├── cli.py         #   spidey serve | setup | run
-│   └── server/        #   FastAPI + WebSocket bridge (+ built UI in static/)
+│   ├── server/        #   FastAPI + WebSocket bridge (+ built UI in static/)
 │   ├── voice.py       #   offline wake word + speech-to-text (Vosk, on-device)
+│   └── platform/      #   the capability platform (10 modules on one core)
+│       ├── core/      #     db+migrations · queue+retry · scheduler · auth · metrics · vectors · LLM bridge
+│       └── modules/   #     webauto · filepipe · analytics · fleet · jobs · research · codeassist · email · driving · team
 ├── web/               # React + Vite + Tailwind + React Flow frontend (chat · graph · voice)
+├── tests/             # pytest suite: core + every module through the real API, fully offline
 ├── training/          # stage 1 SFT + stage 2 DPO → GGUF → Ollama (free GPU)
 └── eval/              # tool-selection accuracy: base vs SFT vs DPO
 ```
@@ -225,6 +287,7 @@ the server with `--https` (one flag; the mic needs a secure page). Details in
 
 | Doc | What's inside |
 |---|---|
+| [docs/PLATFORM.md](docs/PLATFORM.md) | the capability platform — all 10 modules, the shared core, API examples, ops checklist |
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | full system design with diagrams — agent loop, event stream, voice pipeline, persona layers, training flow |
 | [docs/API.md](docs/API.md) | the complete wire protocol (`/ws`, `/ws/voice`, auth) — build your own client |
 | [docs/SECURITY.md](docs/SECURITY.md) | threat model, safety layer, token auth, privacy table, deployment guidance |

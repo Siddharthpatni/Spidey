@@ -16,6 +16,13 @@ dependencies = ["requests>=2.31"]
 [project.optional-dependencies]
 server = ["fastapi>=0.110", "uvicorn>=0.29", "websockets>=12.0"]
 voice = ["vosk>=0.3.45"]
+# Platform power-ups — every module works without these; they unlock extras:
+scrape = ["beautifulsoup4>=4.12", "playwright>=1.40"]   # CSS selectors, JS rendering, screenshots
+pdf = ["pypdf>=4.0"]                                     # PDF ingestion (research/resumes/files)
+ocr = ["pytesseract>=0.3.10", "Pillow>=10.0"]            # read text out of images/screenshots
+vision = ["opencv-python>=4.9", "numpy>=1.26"]           # lane/object detection (driving)
+embeddings = ["sentence-transformers>=2.5"]              # upgrade hashed vectors to real ones
+dev = ["pytest>=8.0", "httpx>=0.27"]                     # test suite (TestClient needs httpx)
 
 [project.urls]
 Homepage = "https://github.com/Siddharthpatni/Spidey"
@@ -25,7 +32,8 @@ Issues = "https://github.com/Siddharthpatni/Spidey/issues"
 spidey = "spidey.cli:main"
 
 [tool.setuptools]
-packages = ["spidey", "spidey.server"]
+packages = ["spidey", "spidey.server", "spidey.platform", "spidey.platform.core",
+            "spidey.platform.modules"]
 
 [tool.setuptools.package-data]
 "spidey.server" = ["static/**/*"]

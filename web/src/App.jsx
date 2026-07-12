@@ -267,6 +267,15 @@ export default function App() {
           >
             🕘<span className="hidden sm:inline"> History</span>
           </button>
+          <a
+            href="/platform"
+            target="_blank"
+            rel="noreferrer"
+            title="Platform dashboard — 10 capability modules, queue, alerts, API docs"
+            className="rounded-lg border border-zinc-700 px-2.5 py-1 text-xs font-semibold text-zinc-300 hover:bg-zinc-800"
+          >
+            🕸<span className="hidden sm:inline"> Platform</span>
+          </a>
           <button
             onClick={() => setShowSettings(true)}
             className="rounded-lg border border-zinc-700 px-2.5 py-1 text-xs font-semibold text-zinc-300 hover:bg-zinc-800"

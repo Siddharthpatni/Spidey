@@ -28,6 +28,7 @@ import sys
 
 # Import Spidey's real tool specs so the model sees exactly what it sees in production.
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent))
+from spidey.agent import _rescue_tool_calls  # noqa: E402
 from spidey.llm import OllamaBackend  # noqa: E402
 from spidey.tools import default_registry  # noqa: E402
 
@@ -48,12 +49,20 @@ def score_task(backend, task, specs):
     except Exception as e:
         return False, False, f"<error: {e}>"
 
-    if not reply.tool_calls:
+    calls = reply.tool_calls
+    if not calls:
+        # Score the production stack, not the raw wire format: Spidey's agent
+        # loop rescues tool calls narrated as JSON text, so the eval does too.
+        calls = _rescue_tool_calls(reply.content, [s["name"] for s in specs])
+    if not calls:
         return False, False, "<no tool call>"
 
-    call = reply.tool_calls[0]
+    # `plan` first is trained team behavior, not a wrong answer — look through
+    # it to the first substantive call.
+    substantive = [c for c in calls if c["name"] != "plan"]
+    call = (substantive or calls)[0]
     tool_ok = call["name"] == task["expected_tool"]
-
+also
     arg_ok = True
     for key, needle in (task.get("must_include") or {}).items():
         val = str(call["arguments"].get(key, ""))

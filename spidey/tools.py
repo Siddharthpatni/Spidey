@@ -176,6 +176,54 @@ def _search_notes(ctx: Context, args: Dict[str, Any]) -> str:
     return search_knowledge(args["query"])
 
 
+def _control_app(ctx: Context, args: Dict[str, Any]) -> str:
+    """Drive native macOS apps (Notes, Reminders, Calendar, Mail, Music, Safari)
+    via AppleScript. Powerful — so every script needs the user's approval."""
+    import platform
+
+    if platform.system() != "Darwin":
+        return "ERROR: control_app drives macOS apps and this isn't a Mac."
+    script = args["script"]
+    if not ctx.approve(f"Run AppleScript?\n    {script[:400]}"):
+        return "DENIED: the user declined this app action."
+    proc = subprocess.run(["osascript", "-e", script],
+                          capture_output=True, text=True, timeout=30)
+    if proc.returncode != 0:
+        return f"ERROR from AppleScript: {proc.stderr.strip()[:400]}"
+    return proc.stdout.strip() or "Done (no output)."
+
+
+def _scrape_page(ctx: Context, args: Dict[str, Any]) -> str:
+    """Fetch a live web page through the platform's extraction ladder."""
+    from .platform.modules.webauto import scrape
+
+    url = args["url"]
+    if not url.startswith(("http://", "https://")):
+        return "ERROR: url must start with http:// or https://"
+    if not ctx.approve(f"Fetch this web page?\n    {url}"):
+        return "DENIED: the user declined the web request."
+    try:
+        result = scrape(url, strategy=args.get("strategy", "auto"),
+                        instruction=args.get("instruction", ""))
+    except Exception as e:
+        return f"ERROR fetching {url}: {type(e).__name__}: {e}"
+    import json as _json
+    return f"[{result['strategy']}] " + _json.dumps(result["data"], ensure_ascii=False)[:7000]
+
+
+def _team_status(ctx: Context, args: Dict[str, Any]) -> str:
+    """Peek at the platform: queue depth, recent jobs, unacked alerts."""
+    from .platform.core import db as pdb
+    from .platform.core.queue import default_queue
+
+    stats = default_queue().stats()
+    alerts = pdb.query("SELECT source, message FROM alerts WHERE acked=0"
+                       " ORDER BY id DESC LIMIT 5")
+    lines = ["queue: " + (", ".join(f"{k}={v}" for k, v in stats.items()) or "empty")]
+    lines += [f"alert[{a['source']}]: {a['message']}" for a in alerts] or ["no active alerts"]
+    return "\n".join(lines)
+
+
 def _finish(ctx: Context, args: Dict[str, Any]) -> str:
     # The agent intercepts calls to `finish` by name; this is only a fallback.
     return args.get("summary", "")
@@ -248,6 +296,20 @@ def default_registry() -> ToolRegistry:
         _remember,
     ))
     reg.register(Tool(
+        "control_app",
+        "Control the user's Mac apps with AppleScript — create Notes, add Reminders, "
+        "read/add Calendar events, draft Mail, control Music, open Safari tabs. The apps "
+        "already sync the user's accounts, so this reaches their real data. Every script "
+        "is shown to the user for approval first. Write minimal, single-purpose scripts.",
+        {"type": "object",
+         "properties": {"script": {"type": "string",
+                                   "description": "A short AppleScript, e.g. 'tell application "
+                                                  "\"Reminders\" to make new reminder with "
+                                                  "properties {name:\"buy milk\"}'."}},
+         "required": ["script"]},
+        _control_app,
+    ))
+    reg.register(Tool(
         "search_notes",
         "Search the user's personal knowledge base — documents they fed Spidey "
         "(`spidey learn <file>`), remembered facts, and lessons from past jobs. Use it "
@@ -256,6 +318,29 @@ def default_registry() -> ToolRegistry:
          "properties": {"query": {"type": "string", "description": "A few key words."}},
          "required": ["query"]},
         _search_notes,
+    ))
+    reg.register(Tool(
+        "scrape_page",
+        "Fetch a live web page and extract its data (structured metadata, tables, links "
+        "or readable text — pass an 'instruction' to get AI-extracted JSON). Use this "
+        "when the task needs information from the internet.",
+        {"type": "object",
+         "properties": {"url": {"type": "string", "description": "Full http(s) URL."},
+                        "strategy": {"type": "string",
+                                     "description": "auto (default), structured, tables, "
+                                                    "links, text or ai."},
+                        "instruction": {"type": "string",
+                                        "description": "What to extract, e.g. "
+                                                       "'product names and prices'."}},
+         "required": ["url"]},
+        _scrape_page,
+    ))
+    reg.register(Tool(
+        "platform_status",
+        "Check Spidey's platform: background job queue depth and any active alerts "
+        "(analytics thresholds, fleet maintenance). Use when asked how the system is doing.",
+        {"type": "object", "properties": {}},
+        _team_status,
     ))
     reg.register(Tool(
         "finish",

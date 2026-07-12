@@ -17,9 +17,9 @@ jobs:
         with:
           python-version: "3.12"
       - name: Install (server + voice extras skipped — vosk needs no model at import time)
-        run: pip install -e ".[server]"
+        run: pip install -e ".[server,dev]"
       - name: Compile
-        run: python -m compileall -q spidey training eval
+        run: python -m compileall -q spidey training eval tests
       - name: Import + app boot
         run: |
           python - <<'EOF'
@@ -28,8 +28,11 @@ jobs:
           app = create_app(token="ci-token")
           routes = {r.path for r in app.routes}
           assert "/ws" in routes and "/ws/voice" in routes, routes
-          print("app boots; routes OK:", sorted(routes))
+          assert "/api/health" in routes and "/metrics" in routes, routes
+          print("app boots; routes OK:", len(routes), "routes")
           EOF
+      - name: Platform test suite (core + all 10 modules, offline paths)
+        run: pytest tests/ -q
       - name: Training data generators (persona SFT + DPO pairs)
         run: |
           python - <<'EOF'

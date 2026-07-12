@@ -161,7 +161,16 @@ def create_app(default_workdir: str = ".", token: Optional[str] = None) -> FastA
     """Build the app. If ``token`` (or $SPIDEY_TOKEN) is set, both WebSockets
     require ``?token=<value>`` — set it whenever the server is reachable by
     anyone but you. Without a token, bind to 127.0.0.1 only."""
-    app = FastAPI(title="Spidey")
+    app = FastAPI(
+        title="Spidey",
+        version="2.0.0",
+        description="Self-hostable AI agent + capability platform: web automation, "
+                    "file pipeline, analytics, fleet, job matching, research, code "
+                    "assistant, email, driving data and a multi-agent team — over one "
+                    "shared queue/scheduler/auth/metrics core. Ops view at /platform.",
+    )
+    from ..platform import mount_platform
+    mount_platform(app)
     default_workdir = str(Path(default_workdir).resolve())
     auth_token = token if token is not None else (os.environ.get("SPIDEY_TOKEN") or None)
 
