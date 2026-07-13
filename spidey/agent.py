@@ -372,6 +372,12 @@ class Agent:
                 return {"answer": f"(stopped: backend error: {msg})",
                         "steps": step, "transcript": transcript}
 
+            # The model's private reasoning (when thinking is on) streams first,
+            # as its own event so the UI can show it as a live "thinking" block.
+            if getattr(reply, "thinking", "").strip():
+                self._log(_c(f"[{step}] ", "1;35") + _c("reason ", "36") + reply.thinking.strip()[:200])
+                self._emit("reasoning", text=reply.thinking.strip())
+
             if reply.content.strip():
                 self._log(_c(f"[{step}] ", "1;35") + _c("think  ", "35") + reply.content.strip())
                 self._emit("think", text=reply.content.strip())

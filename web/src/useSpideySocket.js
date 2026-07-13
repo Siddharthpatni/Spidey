@@ -83,6 +83,12 @@ function applyEvent(state, ev) {
         runMeta: { model: ev.model, workdir: ev.workdir, safety: ev.safety },
         steps: [{ id: uid(), type: 'task', text: ev.task, status: 'ok' }],
       }
+    case 'reasoning':
+      return {
+        ...state,
+        chat: [...state.chat, { id: uid(), kind: 'reasoning', text: ev.text }],
+        steps: [...state.steps, { id: uid(), type: 'reasoning', text: ev.text, status: 'ok' }],
+      }
     case 'think':
       return {
         ...state,

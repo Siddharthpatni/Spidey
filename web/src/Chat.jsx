@@ -47,12 +47,24 @@ function Md({ text }) {
   )
 }
 
+// Pull a downloadable artifact (document / image) out of a tool result so it
+// renders inline in chat — the chat becomes the one place everything shows up.
+function artifactFrom(observation, tool) {
+  if (!observation) return null
+  const m = observation.match(/\/api\/(?:docgen\/files|media)\/\d+\/download/)
+  if (!m) return null
+  const url = m[0]
+  const isImage = tool === 'generate_image' || /image/i.test(observation)
+  return { url, isImage }
+}
+
 function ToolLine({ m }) {
   const [open, setOpen] = useState(false)
   const s = styleFor({ type: 'tool', tool: m.tool })
   const badge = m.status === 'ok' ? '✓' : m.status === 'err' ? '✗' : '⏳'
   const badgeColor =
     m.status === 'ok' ? 'text-emerald-400' : m.status === 'err' ? 'text-rose-400' : 'text-amber-300 animate-pulse'
+  const art = artifactFrom(m.observation, m.tool)
   return (
     <div className="rounded-lg border border-zinc-800 bg-zinc-900/60">
       <button
@@ -64,6 +76,17 @@ function ToolLine({ m }) {
         <span className="truncate text-zinc-500">{JSON.stringify(m.args)}</span>
         <span className={`ml-auto shrink-0 ${badgeColor}`}>{badge}</span>
       </button>
+      {art && (
+        <div className="border-t border-zinc-800 p-3">
+          {art.isImage && (
+            <img src={art.url} alt="" className="mb-2 max-h-72 rounded-lg border border-zinc-800" />
+          )}
+          <a href={art.url} target="_blank" rel="noreferrer"
+            className="inline-block rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-emerald-500">
+            ⬇ Download
+          </a>
+        </div>
+      )}
       {open && m.observation && (
         <pre className="max-h-48 overflow-auto border-t border-zinc-800 px-3 py-2 text-[11px] leading-relaxed text-zinc-400">
           {m.observation}
@@ -106,10 +129,29 @@ function ApprovalCard({ m, active, onAnswer }) {
   )
 }
 
+// The model's private reasoning, shown as a collapsible "thinking" block —
+// open while it streams, tuck it away once the answer lands.
+function Thinking({ text }) {
+  const [open, setOpen] = useState(true)
+  return (
+    <div className="rounded-lg border border-indigo-500/25 bg-indigo-500/5 px-3 py-2">
+      <button onClick={() => setOpen(o => !o)}
+        className="flex items-center gap-1.5 text-xs font-semibold text-indigo-300">
+        <span>💭</span> Thinking <span className="text-indigo-400/60">{open ? '▾' : '▸'}</span>
+      </button>
+      {open && (
+        <div className="mt-1.5 whitespace-pre-wrap text-xs leading-relaxed text-zinc-400">{text}</div>
+      )}
+    </div>
+  )
+}
+
 function Message({ m, approval, onAnswer }) {
   switch (m.kind) {
     case 'user':
       return <div className="spidey-bubble-user ml-8 rounded-xl rounded-br-sm px-3 py-2 text-sm">{m.text}</div>
+    case 'reasoning':
+      return <Thinking text={m.text} />
     case 'think':
       return <div className="px-1 text-sm italic text-zinc-400">🧠 {m.text}</div>
     case 'tool':

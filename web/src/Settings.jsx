@@ -66,8 +66,9 @@ export const defaultConfig = {
   api_key: '',
   base_url: '',
   workdir: '',
-  safety: 'ask',
+  safety: 'off',
   max_steps: 25,
+  think: true,   // show the model's reasoning as a live "thinking" block in chat
 }
 
 export function loadConfig() {
@@ -276,6 +277,14 @@ export default function Settings({ config, onSave, onClose }) {
             />
           </Field>
         </div>
+
+        <label className="flex items-center gap-2 text-sm text-zinc-300">
+          <input type="checkbox" checked={!!cfg.think}
+            onChange={e => set({ think: e.target.checked })}
+            className="h-4 w-4 accent-indigo-500" />
+          Show thinking — stream the model's reasoning in chat
+          <span className="text-xs text-zinc-500">(slower per step on local models)</span>
+        </label>
 
         <button onClick={save} className="w-full rounded-lg spidey-btn-primary py-2 text-sm font-semibold">
           Save

@@ -32,10 +32,12 @@ class AssistantReply:
     """Normalized model output.
 
     ``tool_calls`` is a list of ``{"id": str, "name": str, "arguments": dict}``.
+    ``thinking`` is the model's private reasoning (when the backend surfaces it).
     """
 
     content: str = ""
     tool_calls: List[Dict[str, Any]] = field(default_factory=list)
+    thinking: str = ""
 
 
 class LLMBackend(ABC):
@@ -114,7 +116,8 @@ def _parse_tool_calls(raw_calls, arguments_are_json_strings: bool) -> List[Dict[
 # --------------------------------------------------------------------------- #
 class OllamaBackend(LLMBackend):
     def __init__(self, model: str, base_url: str = "http://localhost:11434",
-                 temperature: float = 0.1, timeout: int = 180):
+                 temperature: float = 0.1, timeout: int = 180,
+                 think: Optional[bool] = None):
         self.model = model
         self.base_url = base_url.rstrip("/")
         self.temperature = temperature
@@ -122,9 +125,9 @@ class OllamaBackend(LLMBackend):
         self.name = f"ollama:{model}"
         # Reasoning models (Gemma 4, Qwen3, …) "think" before answering — measured
         # at >1200 hidden tokens for a one-liner, ~2 minutes per step on a laptop.
-        # Agents make many steps, so thinking is off by default; SPIDEY_THINK=1
-        # re-enables it if you'd rather trade speed for deliberation.
-        self.think = os.environ.get("SPIDEY_THINK", "0") == "1"
+        # When on, the reasoning is surfaced to the UI as a live "thinking" stream.
+        # Explicit ``think`` (from the browser toggle) wins; else $SPIDEY_THINK.
+        self.think = think if think is not None else (os.environ.get("SPIDEY_THINK", "0") == "1")
 
     def chat(self, messages, tools):
         import requests  # lazy
@@ -163,6 +166,7 @@ class OllamaBackend(LLMBackend):
         return AssistantReply(
             content=msg.get("content", "") or "",
             tool_calls=_parse_tool_calls(msg.get("tool_calls"), arguments_are_json_strings=False),
+            thinking=(msg.get("thinking") or "").strip(),
         )
 
 
@@ -312,7 +316,7 @@ PROVIDER_PRESETS: Dict[str, Dict[str, str]] = {
 
 def build_backend(provider: str, model: Optional[str] = None,
                   api_key: Optional[str] = None, base_url: Optional[str] = None,
-                  temperature: float = 0.1) -> LLMBackend:
+                  temperature: float = 0.1, think: Optional[bool] = None) -> LLMBackend:
     """Build a backend from a provider name. Used by both the CLI and the server."""
     preset = PROVIDER_PRESETS.get(provider)
     if preset is None:
@@ -325,7 +329,7 @@ def build_backend(provider: str, model: Optional[str] = None,
     base_url = base_url or preset["base_url"]
 
     if provider == "ollama":
-        return OllamaBackend(model, base_url=base_url, temperature=temperature)
+        return OllamaBackend(model, base_url=base_url, temperature=temperature, think=think)
     if provider == "anthropic":
         return AnthropicBackend(model, api_key=api_key, base_url=base_url)
     if preset["key_env"] and not api_key:

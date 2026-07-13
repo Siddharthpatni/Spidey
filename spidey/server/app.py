@@ -143,11 +143,13 @@ class Session:
     @staticmethod
     def _build_backend(config: Dict[str, Any]):
         provider = config.get("provider", "ollama")
+        think = config.get("think")
         return build_backend(
             provider,
             model=config.get("model") or None,
             api_key=config.get("api_key") or None,
             base_url=config.get("base_url") or None,
+            think=bool(think) if think is not None else None,
         )
 
     # -- teardown ------------------------------------------------------------ #
