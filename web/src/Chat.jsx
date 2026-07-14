@@ -200,26 +200,27 @@ export default function Chat({ state, voice, onStart, onStop, onAnswer }) {
 
   return (
     <div className="spidey-web-bg flex h-full flex-col">
-      <div className="flex-1 space-y-2 overflow-y-auto p-3">
-        {state.chat.length === 0 && (
-          <div className="mt-8 space-y-3 text-center text-sm text-zinc-500">
-            <div className="text-3xl">🕷️</div>
-            <p className="font-semibold text-zinc-400">Your friendly neighborhood AI.</p>
-            <p>Type a task — or turn on the mic and say “Hey Spidey”.</p>
-            <div className="mx-auto flex max-w-xs flex-wrap justify-center gap-1.5 pt-1">
+      <div className="flex-1 overflow-y-auto p-3">
+        {state.chat.length === 0 ? (
+          <div className="mx-auto flex h-full max-w-2xl flex-col items-center justify-center gap-4 px-4 text-center">
+            <div className="text-4xl">🕷️</div>
+            <div>
+              <p className="text-lg font-semibold text-zinc-200">Your friendly neighborhood AI.</p>
+              <p className="mt-1 text-sm text-zinc-500">Ask anything, or say “Hey Spidey”. It can build files, crawl the web, write code, and remember you.</p>
+            </div>
+            <div className="grid w-full grid-cols-1 gap-2 sm:grid-cols-2">
               {[
-                ['📂', 'Organize the files in this folder by type'],
-                ['📝', "Create a note in my Notes app titled 'Ideas' "],
-                ['⏰', "Add a reminder called 'drink water' to my Reminders"],
-                ['💻', 'Find and explain the biggest file in this folder'],
-                ['🧠', 'What do you remember about me?'],
-              ].map(([icon, prompt]) => (
+                ['📄', 'Make me a one-page résumé for a backend role', "Make me a one-page résumé (.docx) for a Python/FastAPI backend engineer role"],
+                ['🌐', 'Crawl a site into my knowledge base', 'Crawl https://example.com into the Knowledge Nexus, then tell me what it says'],
+                ['💻', 'Find & explain the biggest file here', 'Find and explain the biggest file in this folder'],
+                ['🧠', 'What do you remember about me?', 'What do you remember about me?'],
+              ].map(([icon, label, prompt]) => (
                 <button
-                  key={prompt}
+                  key={label}
                   onClick={() => state.connected && onStart(prompt)}
-                  className="rounded-full border border-zinc-700 px-2.5 py-1 text-xs text-zinc-400 hover:border-[var(--spidey-red)] hover:text-zinc-200"
+                  className="flex items-center gap-2.5 rounded-xl border border-zinc-800 bg-zinc-900/50 px-3.5 py-3 text-left text-sm text-zinc-300 transition hover:border-[var(--spidey-red)]/60 hover:bg-zinc-900"
                 >
-                  {icon} {prompt.length > 30 ? prompt.slice(0, 30) + '…' : prompt}
+                  <span className="text-lg">{icon}</span><span className="min-w-0 flex-1">{label}</span>
                 </button>
               ))}
             </div>
@@ -228,17 +229,20 @@ export default function Chat({ state, voice, onStart, onStop, onAnswer }) {
               provider in <span className="font-semibold text-zinc-400">⚙ Settings</span>.
             </p>
           </div>
-        )}
-        {state.chat.map(m => (
-          <div key={m.id} className="spidey-msg">
-            <Message m={m} approval={state.approval} onAnswer={onAnswer} />
+        ) : (
+          <div className="mx-auto w-full max-w-3xl space-y-2">
+            {state.chat.map(m => (
+              <div key={m.id} className="spidey-msg">
+                <Message m={m} approval={state.approval} onAnswer={onAnswer} />
+              </div>
+            ))}
           </div>
-        ))}
+        )}
         <div ref={endRef} />
       </div>
       <VoiceStrip voice={voice} />
       <div className="border-t border-zinc-800 p-3">
-        <div className="flex gap-2">
+        <div className="mx-auto flex max-w-3xl gap-2">
           <textarea
             value={task}
             onChange={e => setTask(e.target.value)}
