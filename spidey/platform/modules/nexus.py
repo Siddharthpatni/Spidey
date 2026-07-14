@@ -315,6 +315,24 @@ def start_crawl(body: CrawlIn) -> dict:
             "note": "distributed across the queue workers — poll GET /api/nexus/status"}
 
 
+@router.post("/crawl-search")
+def crawl_from_search(body: dict) -> dict:
+    """Research a *topic* (not a URL): web-search it, then crawl the top results
+    into the index. Turns 'index everything about the Inspire RH56 hand' into one call."""
+    query = body.get("query", "")
+    if not query.strip():
+        raise HTTPException(422, "query is required")
+    from ..core.websearch import search
+    from ..core.queue import default_queue
+    results = search(query, limit=int(body.get("max_pages", 6)),
+                     scholarly=bool(body.get("scholarly", False)))
+    seeds = [r["url"] for r in results if r["url"].startswith(("http://", "https://"))]
+    for url in seeds:
+        default_queue().enqueue("nexus.crawl", {"url": url, "depth": 0,
+                                                "max_pages": 1, "domain_lock": None})
+    return {"query": query, "queued": len(seeds), "seeds": seeds}
+
+
 @router.post("/crawl-now")
 def crawl_now(body: CrawlIn) -> dict:
     """Crawl the seed synchronously (one page) — handy for tests/quick indexing."""

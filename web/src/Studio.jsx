@@ -148,6 +148,7 @@ const STD_TOOLS = [
       { label: 'Index text', ghost: true, run: async (v, ctx) => { if (!v.text) throw new Error('paste text'); const r = await api('POST', '/api/research/docs', { title: 'Pasted', text: v.text }); ctx.did = r.id; return r } },
       { label: 'Ask', render: (r) => <div><div style={{ whiteSpace: 'pre-wrap' }}>{r.answer}</div><div style={{ color: 'var(--dim)', fontSize: '.78rem', marginTop: '.4rem' }}>{(r.citations || []).map((c) => 'chunk ' + c.chunk).join(', ')}</div></div>, run: (v, ctx) => { if (!ctx.did) throw new Error('upload or index a document first'); return api('POST', '/api/research/ask', { question: v.q || '', doc_id: ctx.did }) } },
       { label: 'Analyze fields', ghost: true, run: (v, ctx) => { if (!ctx.did) throw new Error('upload a document first'); return api('GET', `/api/research/docs/${ctx.did}/analyze`) } },
+      { label: 'Deep research (web)', run: (v) => { if (!v.q) throw new Error('type a question in the box above'); return api('POST', '/api/research/deep', { question: v.q, scholarly: true }) }, render: (r) => <div><div style={{ whiteSpace: 'pre-wrap' }}>{r.answer}</div><div style={{ marginTop: '.5rem' }}>{(r.sources || []).map((s) => <div key={s.n} style={{ fontSize: '.78rem' }}>[{s.n}] <a href={s.url} target="_blank" rel="noreferrer">{s.title}</a> <span className="chip">{s.source}</span></div>)}</div></div> },
     ],
   },
   {
@@ -443,9 +444,9 @@ function NexusTool({ log }) {
       {[[st.indexed, 'pages indexed'], [st.chunks, 'chunks'], [st.duplicates_removed, 'dupes removed'], [st.vocabulary, 'vocabulary'], [st.domains, 'domains']].map(([v, l], i) => <div className="stat" key={i}><b>{v}</b><span>{l}</span></div>)}
     </div>}
     <div className="card">
-      <label>Crawl a site into Spidey's knowledge base (distributed, deduplicated, entity-linked)</label>
-      <div className="row"><input style={{ flex: 3 }} value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://example.com" />
-        <button disabled={!!busy} onClick={() => act('crawl', () => api('POST', '/api/nexus/crawl', { url, depth: 1, max_pages: 15 }))}>Crawl</button></div>
+      <label>Crawl a site — or a whole topic — into Spidey's knowledge base (deduplicated, entity-linked)</label>
+      <div className="row"><input style={{ flex: 3 }} value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://example.com  — or a topic like 'Inspire RH56 hand RS485'" />
+        <button disabled={!!busy} onClick={() => act('crawl', () => url.startsWith('http') ? api('POST', '/api/nexus/crawl', { url, depth: 1, max_pages: 15 }) : api('POST', '/api/nexus/crawl-search', { query: url, max_pages: 6 }))}>Crawl</button></div>
       <label style={{ marginTop: '.7rem' }}>Hybrid search over everything indexed</label>
       <div className="row"><input style={{ flex: 3 }} value={q} onChange={(e) => setQ(e.target.value)} placeholder="e.g. how does self-attention work" />
         <button disabled={!!busy} onClick={() => act('search', () => api('GET', '/api/nexus/search?q=' + encodeURIComponent(q)), results)}>Search</button>

@@ -568,14 +568,15 @@ def _fetch_sources(topic: str) -> List[Dict[str, str]]:
     except Exception:
         pass
 
-    # Anything already crawled into the Knowledge Nexus about this topic — lets the
-    # user seed datasheets/manuals (e.g. the hand's RS485 manual) and have the paper
-    # actually cite them.
+    # General web + anything crawled into the Knowledge Nexus (datasheets, manuals),
+    # via the shared search substrate — so the paper can cite primary sources.
     try:
-        from .nexus import hybrid_search
-        for h in hybrid_search(topic, k=4):
-            sources.append({"ref": f"{h['title'] or h['url']}. Available: {h['url']}",
-                            "doi": "", "summary": h["snippet"]})
+        from ..core.websearch import search
+        for r in search(topic, limit=6, scholarly=True):
+            if r["source"] in ("arxiv", "wikipedia"):
+                continue  # already covered above
+            sources.append({"ref": f"{r['title']}. Available: {r['url']}",
+                            "doi": "", "summary": r.get("snippet", "")})
     except Exception:
         pass
     return sources

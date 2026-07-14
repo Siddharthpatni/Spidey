@@ -212,6 +212,43 @@ def compare_docs(a: int, b: int) -> dict:
     return compare(a, b)
 
 
+@router.post("/deep")
+def deep_research(body: dict) -> dict:
+    """Deep research a question: web-search it, fetch + read the top pages, then
+    synthesize a cited answer. Real sources, not just what's already uploaded."""
+    question = (body.get("question") or body.get("query") or "").strip()
+    if not question:
+        raise HTTPException(422, "question is required")
+    from ..core.websearch import search
+    from .webauto import fetch
+    from ..core.text import strip_html
+    results = search(question, limit=int(body.get("sources", 5)),
+                     scholarly=bool(body.get("scholarly", True)))
+    if not results:
+        raise HTTPException(502, "no web results — check connectivity")
+    passages = []
+    for r in results:
+        text = r.get("snippet") or ""
+        if not text and r["url"].startswith("http"):
+            try:
+                text = strip_html(fetch(r["url"]))[:2500]
+            except Exception:
+                text = ""
+        if text:
+            passages.append((r, text))
+    context = "\n\n".join(f"[{i+1}] {r['title']} ({r['url']})\n{t[:1500]}"
+                          for i, (r, t) in enumerate(passages))
+    llm = llmutil.ask(
+        f"Research question: {question}\n\nUsing ONLY these sources, write a thorough, "
+        f"cited answer (use [n]); note any disagreements between sources.\n\n{context}",
+        system="You are a rigorous research assistant. Cite sources as [n]; never invent facts.")
+    return {"question": question,
+            "answer": llm or "No model reachable — sources below.",
+            "mode": "llm" if llm else "sources_only",
+            "sources": [{"n": i + 1, "title": r["title"], "url": r["url"],
+                         "source": r["source"]} for i, (r, _) in enumerate(passages)]}
+
+
 # ------- document analyzer (ported from the author's vergabepilot-ai) -------- #
 # German day-first DD.MM.YYYY and ISO YYYY-MM-DD, optional ", HH:MM[:SS] Uhr".
 _DMY = re.compile(r"\b(\d{1,2})[.\-/](\d{1,2})[.\-/](\d{2,4})"

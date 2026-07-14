@@ -227,6 +227,25 @@ def _scrape_page(ctx: Context, args: Dict[str, Any]) -> str:
     return f"[{result['strategy']}] " + _json.dumps(result["data"], ensure_ascii=False)[:7000]
 
 
+def _web_search(ctx: Context, args: Dict[str, Any]) -> str:
+    """Search the live web (DuckDuckGo + arXiv + Wikipedia + Spidey's own index)."""
+    from .platform.core.websearch import search
+
+    query = args.get("query", "")
+    if not query.strip():
+        return "ERROR: 'query' is required"
+    try:
+        results = search(query, limit=int(args.get("limit", 8)),
+                         scholarly=bool(args.get("scholarly", False)))
+    except Exception as e:
+        return f"ERROR searching: {type(e).__name__}: {e}"
+    if not results:
+        return "No results found."
+    return "\n".join(f"[{r['source']}] {r['title']}\n    {r['url']}"
+                     + (f"\n    {r['snippet'][:200]}" if r.get('snippet') else "")
+                     for r in results)
+
+
 def _knowledge_search(ctx: Context, args: Dict[str, Any]) -> str:
     """Search Spidey's own crawled knowledge base (Knowledge Nexus) with hybrid
     BM25 + vector + graph ranking. Optionally crawl a seed URL first."""
@@ -462,6 +481,20 @@ def default_registry() -> ToolRegistry:
         "(analytics thresholds, fleet maintenance). Use when asked how the system is doing.",
         {"type": "object", "properties": {}},
         _team_status,
+    ))
+    reg.register(Tool(
+        "web_search",
+        "Search the live web for current information (aggregates DuckDuckGo, arXiv, "
+        "Wikipedia, and Spidey's own crawled index). Use for research, finding sources, "
+        "datasheets, papers, or anything you don't already know. Set scholarly=true to "
+        "favor academic papers.",
+        {"type": "object",
+         "properties": {"query": {"type": "string"},
+                        "scholarly": {"type": "boolean",
+                                      "description": "Favor arXiv/academic sources."},
+                        "limit": {"type": "integer"}},
+         "required": ["query"]},
+        _web_search,
     ))
     reg.register(Tool(
         "knowledge_search",

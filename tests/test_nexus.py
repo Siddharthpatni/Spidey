@@ -111,6 +111,41 @@ def test_memory_dedupes(client):
     assert b.get("deduped") and b["id"] == a["id"]
 
 
+# ------------------------- shared web search substrate ----------------------- #
+def test_websearch_dedupes_across_sources(client, monkeypatch):
+    from spidey.platform.core import websearch
+    monkeypatch.setattr(websearch, "_ddg", lambda q, n: [
+        {"title": "A", "url": "https://x.test/a", "snippet": "", "source": "web"},
+        {"title": "A dup", "url": "https://x.test/a/", "snippet": "", "source": "web"}])
+    monkeypatch.setattr(websearch, "_arxiv", lambda q, n: [
+        {"title": "Paper", "url": "https://arxiv.org/abs/1", "snippet": "s", "source": "arxiv"}])
+    monkeypatch.setattr(websearch, "_wikipedia", lambda q: [])
+    monkeypatch.setattr(websearch, "_nexus", lambda q, n: [])
+    rs = websearch.search("anything", limit=10)
+    urls = [r["url"] for r in rs]
+    assert "https://x.test/a" in urls and "https://arxiv.org/abs/1" in urls
+    assert len(urls) == 2  # the trailing-slash duplicate is collapsed
+
+
+def test_nexus_crawl_from_search_queues_seeds(client, monkeypatch):
+    import spidey.platform.core.websearch as ws
+    monkeypatch.setattr(ws, "search", lambda q, limit=6, scholarly=False: [
+        {"title": "M", "url": "https://seed.test/1", "snippet": "", "source": "web"},
+        {"title": "N", "url": "https://seed.test/2", "snippet": "", "source": "web"}])
+    r = client.post("/api/nexus/crawl-search", json={"query": "inspire rh56 hand"}).json()
+    assert r["queued"] == 2 and r["seeds"][0].startswith("https://seed.test")
+
+
+def test_research_deep_synthesizes_from_sources(client, monkeypatch):
+    import spidey.platform.core.websearch as ws
+    monkeypatch.setattr(ws, "search", lambda q, limit=5, scholarly=True: [
+        {"title": "RS485 basics", "url": "https://ref.test/rs485",
+         "snippet": "RS485 is a serial bus standard for multi-drop networks.", "source": "web"}])
+    r = client.post("/api/research/deep", json={"question": "what is RS485?"}).json()
+    assert r["sources"] and r["sources"][0]["url"] == "https://ref.test/rs485"
+    assert "answer" in r
+
+
 # --------------------------- cross-device chat history ----------------------- #
 def test_chat_history_persists_and_lists(client):
     from spidey.platform.modules.chat_history import save_turn
