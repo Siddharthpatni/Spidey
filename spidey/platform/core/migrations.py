@@ -178,4 +178,71 @@ MIGRATIONS = [
     CREATE INDEX idx_kg_edges_src ON kg_edges(src);
     CREATE INDEX idx_kg_edges_dst ON kg_edges(dst);
     """),
+
+    (5, """
+    -- Knowledge Nexus: a distributed web-intelligence layer ---------------------
+    -- crawled pages (content-addressed + SimHash for near-duplicate detection)
+    CREATE TABLE nexus_pages(
+        id INTEGER PRIMARY KEY, url TEXT NOT NULL UNIQUE, domain TEXT,
+        title TEXT, lang TEXT, depth INTEGER NOT NULL DEFAULT 0,
+        sha256 TEXT, simhash INTEGER,
+        status TEXT NOT NULL DEFAULT 'indexed',   -- indexed|duplicate|failed|unchanged
+        dup_of INTEGER, authority REAL NOT NULL DEFAULT 0,
+        fetched_at TEXT, changed_at TEXT, revisits INTEGER NOT NULL DEFAULT 0);
+    CREATE INDEX idx_nexus_domain ON nexus_pages(domain);
+    CREATE INDEX idx_nexus_simhash ON nexus_pages(simhash);
+
+    -- semantic chunks (vector search) + token count (BM25 length norm)
+    CREATE TABLE nexus_chunks(
+        id INTEGER PRIMARY KEY, page_id INTEGER NOT NULL REFERENCES nexus_pages(id),
+        seq INTEGER NOT NULL, text TEXT NOT NULL, vec TEXT NOT NULL,
+        ntokens INTEGER NOT NULL DEFAULT 0);
+    CREATE INDEX idx_nexus_chunks_page ON nexus_chunks(page_id);
+
+    -- inverted index for BM25 keyword search
+    CREATE TABLE nexus_postings(
+        term TEXT NOT NULL, chunk_id INTEGER NOT NULL, tf INTEGER NOT NULL);
+    CREATE INDEX idx_nexus_post_term ON nexus_postings(term);
+    CREATE TABLE nexus_terms(term TEXT PRIMARY KEY, df INTEGER NOT NULL DEFAULT 0);
+
+    -- search feedback → learning-to-rank signal
+    CREATE TABLE nexus_feedback(
+        id INTEGER PRIMARY KEY, query TEXT, chunk_id INTEGER, clicked INTEGER,
+        ts TEXT NOT NULL);
+    """),
+
+    (6, """
+    -- Memory Engine: typed, structured long-term memory (ChatGPT-memory, better) --
+    CREATE TABLE memories(
+        id INTEGER PRIMARY KEY,
+        scope TEXT NOT NULL DEFAULT 'long',   -- long|semantic|episodic|procedural
+        kind TEXT NOT NULL,                   -- preference|goal|project|fact|skill|workflow|episode|mistake
+        content TEXT NOT NULL, vec TEXT,
+        importance REAL NOT NULL DEFAULT 1,
+        source TEXT, uses INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT NOT NULL, last_used_at TEXT);
+    CREATE INDEX idx_memories_kind ON memories(kind);
+    CREATE INDEX idx_memories_scope ON memories(scope);
+    """),
+
+    (7, """
+    -- Chat history in the DB → the same conversations on every device on the LAN
+    CREATE TABLE chat_conversations(
+        id INTEGER PRIMARY KEY, title TEXT NOT NULL,
+        created_at TEXT NOT NULL, updated_at TEXT NOT NULL);
+    CREATE TABLE chat_messages(
+        id INTEGER PRIMARY KEY,
+        conversation_id INTEGER NOT NULL REFERENCES chat_conversations(id),
+        role TEXT NOT NULL,                   -- user | assistant
+        content TEXT NOT NULL, ts TEXT NOT NULL);
+    CREATE INDEX idx_chat_messages_conv ON chat_messages(conversation_id, id);
+    """),
+
+    (8, """
+    -- Device-wise sessions: attribute each conversation to the person/device that
+    -- created it, so friends sharing one Spidey see whose chat is whose.
+    ALTER TABLE chat_conversations ADD COLUMN device_id TEXT;
+    ALTER TABLE chat_conversations ADD COLUMN device_label TEXT;
+    CREATE INDEX idx_chat_conv_device ON chat_conversations(device_id);
+    """),
 ]

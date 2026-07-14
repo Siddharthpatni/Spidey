@@ -71,13 +71,26 @@ export const defaultConfig = {
   think: true,   // show the model's reasoning as a live "thinking" block in chat
 }
 
+// A stable per-browser id so, on a shared instance, each friend's chats are
+// attributed to their device.
+export function deviceId() {
+  let id = localStorage.getItem('spidey-device-id')
+  if (!id) {
+    id = 'dev_' + Math.random().toString(36).slice(2, 10)
+    localStorage.setItem('spidey-device-id', id)
+  }
+  return id
+}
+
 export function loadConfig() {
   try {
     const cfg = { ...defaultConfig, ...JSON.parse(localStorage.getItem('spidey-config') || '{}') }
     if (!PROVIDERS.some(p => p.id === cfg.provider)) cfg.provider = defaultConfig.provider
+    cfg.device_id = deviceId()
+    cfg.device_label = localStorage.getItem('spidey-device-label') || ''
     return cfg
   } catch {
-    return { ...defaultConfig }
+    return { ...defaultConfig, device_id: deviceId() }
   }
 }
 
@@ -285,6 +298,12 @@ export default function Settings({ config, onSave, onClose }) {
           Show thinking — stream the model's reasoning in chat
           <span className="text-xs text-zinc-500">(slower per step on local models)</span>
         </label>
+
+        <Field label="Your name (shared instance — labels your chats for friends)">
+          <input value={cfg.device_label || ''}
+            onChange={e => { set({ device_label: e.target.value }); localStorage.setItem('spidey-device-label', e.target.value) }}
+            placeholder="e.g. Sid's MacBook" className={inputCls} />
+        </Field>
 
         <button onClick={save} className="w-full rounded-lg spidey-btn-primary py-2 text-sm font-semibold">
           Save

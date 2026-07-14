@@ -68,6 +68,8 @@ class Session:
         # Conversation memory for this socket: past (task, answer) turns, so
         # follow-ups build on each other like a real conversation.
         self.history: list[Dict[str, Any]] = []
+        # DB conversation id — persists chat history across devices on the network.
+        self.conversation_id: Optional[int] = None
 
     # -- called from the agent's worker thread ------------------------------ #
     def _push(self, payload: Dict[str, Any]) -> None:
@@ -132,6 +134,17 @@ class Session:
                 self.history += [{"role": "user", "content": task},
                                  {"role": "assistant", "content": answer}]
                 del self.history[:-24]
+                # Persist to the shared DB so this conversation shows up on every
+                # device on the network (best-effort — never break the run).
+                try:
+                    from ..platform.modules.chat_history import save_turn
+                    self.conversation_id = save_turn(
+                        self.conversation_id, task, answer,
+                        device_id=config.get("device_id"),
+                        device_label=config.get("device_label"))
+                    self._push({"type": "conversation", "id": self.conversation_id})
+                except Exception:
+                    pass
         except RunCancelled:
             self._push({"type": "error", "step": 0, "message": "Run stopped by user."})
         except Exception as e:  # config/backend errors -> surface, don't kill the socket
@@ -234,6 +247,7 @@ def create_app(default_workdir: str = ".", token: Optional[str] = None) -> FastA
                     session.cancel()
                 elif mtype == "new_chat":
                     session.history.clear()
+                    session.conversation_id = None  # start a fresh DB conversation
         except WebSocketDisconnect:
             pass
         finally:

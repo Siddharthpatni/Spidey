@@ -142,18 +142,47 @@ flowchart TD
 
 The agent keeps an OpenAI-style message history, hands the model JSON-schema tools, and loops: **model picks a tool → safety layer checks it → tool runs → result goes back to the model** until it calls `finish`. Every provider quirk lives in a backend ([spidey/llm.py](spidey/llm.py)); every dangerous action lives behind the safety layer ([spidey/safety.py](spidey/safety.py)); every step is emitted as a structured event ([spidey/events.py](spidey/events.py)) that the web UI renders live. The core loop ([spidey/agent.py](spidey/agent.py)) stays deliberately small and readable.
 
+## 🧠 SpiderVerse AI OS — the architecture
+
+Spidey is built as a **modular AI operating system**, not one prompt in a wrapper.
+Each capability is a service on one shared core, so the layers map cleanly onto how
+real AI infrastructure is built — sized to run **fully offline on a laptop** (the
+"real" heavy component is noted in parentheses):
+
+| Layer | Realized by | (Enterprise equivalent) |
+|---|---|---|
+| **Interface** | React chat + voice (Vosk) + the Studio SPA + REST/OpenAPI | ChatGPT/Claude UI |
+| **Knowledge Nexus** ⭐ | `nexus` — distributed crawl frontier, SimHash dedup, entity extraction, incremental updates, hybrid **BM25 + vector + graph + recency** search | a mini Google for your AI |
+| **Knowledge Graph** | `brain` / `core.graph` — typed nodes + edges, self-building | Neo4j |
+| **Retrieval Engine** | `nexus.hybrid_search` + `research` RAG | Elasticsearch + Qdrant |
+| **Memory Engine** | `memory_engine` — typed long/semantic/episodic/procedural memory, semantic recall, profile | ChatGPT Memory |
+| **Multi-Agent Orchestrator** | `team` — Planner → Researcher → Coder → Reviewer → Tester → Docs | LangGraph/CrewAI |
+| **Model Router** | `router` — task → best Spider/model; **Local AI** (Ollama) + **Cloud AI** (`llm` gateway, Claude/Gemini/GPT with fallback) | vLLM + a gateway |
+| **Reflection / Learning** | Editor review + lessons journal + knowledge-graph growth | — |
+| **Scheduler / Queue / Cache** | `scheduler` + retrying job `queue` + SQLite WAL | Airflow + Kafka + Redis |
+| **Observability** | `/metrics` (Prometheus), per-call LLM cost/latency traces, event log | Prometheus + Grafana + OpenTelemetry |
+| **Security** | API-key vault (hashed), token-gated sockets, command-safety layer, secrets never stored | Vault + RBAC |
+| **Deployment** | `Dockerfile` + `docker compose` sandbox, `make sandbox` | Docker + K8s |
+
+Honest scope: this realizes ~20 of the classic AI-OS layers as **working code with
+tests**, running offline. Heavy managed backends (Kafka, Neo4j, Elasticsearch,
+Milvus, K8s) are represented by their offline equivalents on the shared core — the
+architecture and data-flow are the same, the ops footprint is a laptop. A few
+layers (plugin marketplace, visual workflow builder) are roadmap, and marked so.
+
 ## 🕸 The Platform — a Spider-Verse AI Studio
 
-The same server that hosts the agent ships a **capability platform**: fourteen
+The same server that hosts the agent ships a **capability platform**: seventeen
 production-style modules on one shared core (SQLite + migrations, a retrying job
 queue, a scheduler, API-key auth, Prometheus metrics, webhooks, an offline vector
 store, a **self-building knowledge graph**, and a traced LLM bridge). REST under
 `/api/*`, live OpenAPI docs at **`/docs`**, metrics at **`/metrics`** — and a
-full **Spider-Verse Studio at `/platform`**: a single-page app (matching the agent
-chat's suit-red/blue theme, spider-web background and animations) with a sidebar of
-AI tools that swap in place — no page reloads, back/reload buttons, and a session
-picker so your work follows you to any device on the network. Generate a document,
-write an IEEE paper, watch the knowledge graph grow — all with buttons, no curl.
+full **Spider-Verse Studio at `/platform`**: a React single-page app (same bundle
+and suit-red/blue theme as the agent chat, spider-web background, a fast tap-to-skip
+Spider-Verse boot screen) with a responsive sidebar of AI tools that swap in place —
+no page reloads, back/reload buttons, and a session picker so your work follows you
+to any device on the network. Generate a document, crawl the web into the Knowledge
+Nexus, write an IEEE paper, watch the knowledge graph pulse like a neural net.
 
 | Module | What it does |
 |---|---|

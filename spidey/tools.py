@@ -227,6 +227,35 @@ def _scrape_page(ctx: Context, args: Dict[str, Any]) -> str:
     return f"[{result['strategy']}] " + _json.dumps(result["data"], ensure_ascii=False)[:7000]
 
 
+def _knowledge_search(ctx: Context, args: Dict[str, Any]) -> str:
+    """Search Spidey's own crawled knowledge base (Knowledge Nexus) with hybrid
+    BM25 + vector + graph ranking. Optionally crawl a seed URL first."""
+    from .platform.modules.nexus import hybrid_search, crawl_one
+    from urllib.parse import urlparse
+
+    seed = args.get("crawl")
+    crawled = ""
+    if seed:
+        if not seed.startswith(("http://", "https://")):
+            return "ERROR: 'crawl' must be an http(s) URL"
+        try:
+            r = crawl_one(seed, depth=int(args.get("depth", 1)),
+                          max_pages=int(args.get("max_pages", 15)),
+                          domain_lock=urlparse(seed).netloc)
+            crawled = f"(crawled {seed}: {r.get('status')}, discovered {r.get('discovered', 0)} links)\n"
+        except Exception as e:
+            crawled = f"(crawl of {seed} failed: {e})\n"
+    query = args.get("query", "")
+    if not query.strip():
+        return crawled + "Provide a 'query' to search the knowledge base."
+    hits = hybrid_search(query, k=int(args.get("k", 6)))
+    if not hits:
+        return crawled + "No results — the knowledge base is empty. Pass a 'crawl' URL to fill it."
+    lines = [f"[{h['score']}] {h['title'] or h['url']} — {h['url']}\n    {h['snippet']}"
+             for h in hits]
+    return crawled + "\n".join(lines)
+
+
 def _team_status(ctx: Context, args: Dict[str, Any]) -> str:
     """Peek at the platform: queue depth, recent jobs, unacked alerts."""
     from .platform.core import db as pdb
@@ -433,6 +462,21 @@ def default_registry() -> ToolRegistry:
         "(analytics thresholds, fleet maintenance). Use when asked how the system is doing.",
         {"type": "object", "properties": {}},
         _team_status,
+    ))
+    reg.register(Tool(
+        "knowledge_search",
+        "Search Spidey's own continuously-crawled knowledge base (Knowledge Nexus) with "
+        "hybrid BM25 + semantic + graph ranking — its long-term web memory. Pass a 'crawl' "
+        "URL to fetch + index a site first, then 'query' to search it. Use for research "
+        "that should persist and improve over time, not one-off fetches.",
+        {"type": "object",
+         "properties": {
+            "query": {"type": "string", "description": "What to search for."},
+            "crawl": {"type": "string", "description": "Optional seed URL to crawl+index first."},
+            "depth": {"type": "integer", "description": "Link-follow depth when crawling (default 1)."},
+            "max_pages": {"type": "integer"}},
+         "required": ["query"]},
+        _knowledge_search,
     ))
     reg.register(Tool(
         "http_request",

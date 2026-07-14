@@ -171,6 +171,22 @@ const STD_TOOLS = [
     ],
   },
   {
+    id: 'memory', sec: 'Extract', ico: '🗄', name: 'Memory Engine',
+    desc: "Typed long-term memory (preferences · goals · projects · facts · workflows) the AI carries across sessions. Semantic recall retrieves what's relevant, not just recent. Sync folds in Spidey's markdown memory + lessons.",
+    rows: [[
+      { key: 'kind', type: 'select', label: 'Type', options: ['preference', 'goal', 'project', 'fact', 'skill', 'workflow'] },
+      { key: 'content', type: 'text', flex: 3, label: 'Remember this', placeholder: 'e.g. I prefer TypeScript and tabs over spaces' },
+    ], [
+      { key: 'q', type: 'text', flex: 3, label: 'Recall (semantic)', placeholder: 'what do you know about my preferences?' },
+    ]],
+    actions: [
+      { label: 'Remember', run: (v) => api('POST', '/api/memory/remember', { content: v.content || '', kind: v.kind || 'fact' }) },
+      { label: 'Recall', ghost: true, render: (r) => r.memories?.length ? <div>{r.memories.map((m) => <div className="card" key={m.id} style={{ marginBottom: '.4rem' }}><span className="pill red">{m.kind}</span> <span className="pill">{m.score}</span><div style={{ marginTop: '.3rem' }}>{m.content}</div></div>)}</div> : 'Nothing recalled yet.', run: (v) => api('GET', '/api/memory/recall?q=' + encodeURIComponent(v.q || '')) },
+      { label: 'My profile', ghost: true, run: () => api('GET', '/api/memory/profile') },
+      { label: 'Sync markdown memory', ghost: true, run: () => api('POST', '/api/memory/sync') },
+    ],
+  },
+  {
     id: 'code', sec: 'Engineer', ico: '💻', name: 'Code Assistant',
     desc: 'Paste code to hunt bugs (AST analysis) or generate pytest tests.',
     fields: [{ key: 'code', type: 'textarea', label: 'Code', style: { fontFamily: 'ui-monospace,monospace' }, placeholder: 'Paste Python…' }],
@@ -393,6 +409,44 @@ function NeuralGraph({ version }) {
   return <canvas ref={canvasRef} className="bn-svg" />
 }
 
+// Knowledge Nexus — crawl the web into the AI's own searchable memory, then
+// run hybrid (BM25 + vector + graph + recency) search over it. Live crawl stats.
+function NexusTool({ log }) {
+  const [url, setUrl] = useState(''); const [q, setQ] = useState('')
+  const [st, setSt] = useState(null); const [out, setOut] = useState(null); const [busy, setBusy] = useState(null)
+  const refresh = async () => { try { setSt(await api('GET', '/api/nexus/status')) } catch { /* offline */ } }
+  useEffect(() => { refresh(); const iv = setInterval(refresh, 4000); return () => clearInterval(iv) }, [])
+  const act = async (name, fn, render) => {
+    setBusy(name)
+    try { const r = await fn(); setOut(render ? render(r) : <pre style={{ whiteSpace: 'pre-wrap', margin: 0 }}>{pretty(r)}</pre>); refresh(); log && log('nexus', name, url || q, r) }
+    catch (e) { setOut(<span className="bad">✗ {e.message}</span>) }
+    setBusy(null)
+  }
+  const results = (r) => r.results?.length ? r.results.map((h, i) => (
+    <div className="card" key={i} style={{ marginBottom: '.5rem' }}>
+      <div style={{ display: 'flex', gap: '.5rem', alignItems: 'baseline', flexWrap: 'wrap' }}>
+        <span className="pill red">{h.score}</span><b>{h.title || h.url}</b></div>
+      <a href={h.url} target="_blank" rel="noreferrer" style={{ fontSize: '.76rem' }}>{h.url}</a>
+      <div style={{ color: 'var(--dim)', fontSize: '.82rem', marginTop: '.3rem' }}>{h.snippet}</div>
+      <div style={{ marginTop: '.3rem' }}>{Object.entries(h.signals || {}).map(([k, v]) => <span className="chip" key={k}>{k}: {v}</span>)}</div>
+    </div>)) : <span className="warn">No results — crawl a site first.</span>
+  return (<>
+    {st && <div className="stats">
+      {[[st.indexed, 'pages indexed'], [st.chunks, 'chunks'], [st.duplicates_removed, 'dupes removed'], [st.vocabulary, 'vocabulary'], [st.domains, 'domains']].map(([v, l], i) => <div className="stat" key={i}><b>{v}</b><span>{l}</span></div>)}
+    </div>}
+    <div className="card">
+      <label>Crawl a site into Spidey's knowledge base (distributed, deduplicated, entity-linked)</label>
+      <div className="row"><input style={{ flex: 3 }} value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://example.com" />
+        <button disabled={!!busy} onClick={() => act('crawl', () => api('POST', '/api/nexus/crawl', { url, depth: 1, max_pages: 15 }))}>Crawl</button></div>
+      <label style={{ marginTop: '.7rem' }}>Hybrid search over everything indexed</label>
+      <div className="row"><input style={{ flex: 3 }} value={q} onChange={(e) => setQ(e.target.value)} placeholder="e.g. how does self-attention work" />
+        <button disabled={!!busy} onClick={() => act('search', () => api('GET', '/api/nexus/search?q=' + encodeURIComponent(q)), results)}>Search</button>
+        <button className="ghost" disabled={!!busy} onClick={() => act('answer', () => api('GET', '/api/nexus/answer?q=' + encodeURIComponent(q)), (r) => <div><div style={{ whiteSpace: 'pre-wrap' }}>{r.answer}</div><div style={{ marginTop: '.5rem' }}>{results(r)}</div></div>)}>Ask (RAG)</button></div>
+    </div>
+    {out && <div className="out">{out}</div>}
+  </>)
+}
+
 function BrainTool({ log }) {
   const [a, setA] = useState(''); const [b, setB] = useState(''); const [text, setText] = useState('')
   const [st, setSt] = useState(null); const [out, setOut] = useState(null); const [busy, setBusy] = useState(null)
@@ -455,10 +509,11 @@ function useSessions() {
 
 const CUSTOM = {
   home: HomeView, brain: BrainTool, history: HistoryView,
-  paper: PaperTool, team: TeamTool,
+  paper: PaperTool, team: TeamTool, nexus: NexusTool,
 }
 const EXTRA_TOOLS = [
   { id: 'paper', sec: 'Create', ico: '🔬', name: 'Research Paper (IEEE)', desc: 'Give a topic; Spidey fetches real references (Crossref + Wikipedia) and writes a full IEEE-format paper section by section, live.' },
+  { id: 'nexus', sec: 'Extract', ico: '🌐', name: 'Knowledge Nexus', desc: "The flagship: a mini search-engine for your AI. Crawls the web (distributed, deduplicated, entity-linked into the knowledge graph), then serves hybrid BM25 + vector + graph + recency search. Spidey's continuously-updating long-term web memory." },
   { id: 'team', sec: 'Engineer', ico: '🤝', name: 'AI Dev Team', desc: 'Planner → Researcher → Coder → Reviewer → Tester → Docs, with shared memory. Heavy task; needs a model.' },
   { id: 'brain', sec: '', ico: '🧠', name: 'Knowledge Graph', desc: "Spidey's connected memory. Every doc, repo, resume and remembered fact becomes nodes linked by how they relate — the AI reasons over connections, and it grows on its own." },
   { id: 'home', sec: '', ico: '🏠', name: 'Overview' },
@@ -472,7 +527,9 @@ const ALL = [
   STD_TOOLS.find((t) => t.id === 'media'),
   STD_TOOLS.find((t) => t.id === 'llm'),
   STD_TOOLS.find((t) => t.id === 'scrape'),
+  EXTRA_TOOLS.find((t) => t.id === 'nexus'),
   STD_TOOLS.find((t) => t.id === 'research'),
+  STD_TOOLS.find((t) => t.id === 'memory'),
   STD_TOOLS.find((t) => t.id === 'match'),
   STD_TOOLS.find((t) => t.id === 'code'),
   EXTRA_TOOLS.find((t) => t.id === 'team'),
