@@ -2,7 +2,15 @@ import React, { useEffect, useRef, useState } from 'react'
 import './studio.css'
 
 /* ---------------- API + session helpers ---------------- */
-const apiKey = () => localStorage.getItem('spidey_api_key') || ''
+// Unify the credential across the whole app: a ?token= in the URL, the chat's
+// token, or a Studio-set key — so opening /platform from chat is authorized.
+const apiKey = () => {
+  try {
+    const fromUrl = new URLSearchParams(window.location.search).get('token')
+    if (fromUrl) localStorage.setItem('spidey_api_key', fromUrl)
+  } catch { /* ignore */ }
+  return localStorage.getItem('spidey_api_key') || localStorage.getItem('spidey-token') || ''
+}
 const hdrs = (extra) => ({ ...(apiKey() ? { 'X-API-Key': apiKey() } : {}), ...(extra || {}) })
 async function api(method, path, body, raw) {
   const o = { method, headers: hdrs(body && !raw ? { 'content-type': 'application/json' } : {}) }
@@ -536,7 +544,7 @@ const ALL = [
   ...STD_TOOLS.filter((t) => t.sec === 'Data'),
   EXTRA_TOOLS.find((t) => t.id === 'brain'),
   EXTRA_TOOLS.find((t) => t.id === 'history'),
-]
+].filter(Boolean)   // a missing id must never blank out the whole sidebar
 
 function HomeView({ select }) {
   const [st, setSt] = useState(null)
