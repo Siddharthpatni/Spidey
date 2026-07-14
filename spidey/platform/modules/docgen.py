@@ -515,13 +515,36 @@ PAPER_SECTIONS = [
 
 
 def _fetch_sources(topic: str) -> List[Dict[str, str]]:
-    """Real references: Crossref (academic, with DOIs) + Wikipedia summary.
-    Free APIs, no keys; failures just mean fewer sources."""
+    """Real references from arXiv (the home of robotics/ML papers, with abstracts),
+    Crossref (DOIs), Wikipedia, and anything already crawled into the Knowledge
+    Nexus. Free APIs, no keys; each failure just means fewer sources."""
+    import re as _re
     import requests
     sources: List[Dict[str, str]] = []
+
+    # arXiv — best coverage for engineering topics, and abstracts feed the writer.
+    try:
+        r = requests.get("http://export.arxiv.org/api/query",
+                         params={"search_query": f"all:{topic}", "max_results": 6,
+                                 "sortBy": "relevance"}, timeout=15)
+        for entry in _re.findall(r"(?s)<entry>(.*?)</entry>", r.text):
+            title = _re.search(r"<title>(.*?)</title>", entry, _re.S)
+            summ = _re.search(r"<summary>(.*?)</summary>", entry, _re.S)
+            authors = _re.findall(r"<name>(.*?)</name>", entry)
+            year = (_re.search(r"<published>(\d{4})", entry) or [None, ""])[1]
+            aid = _re.search(r"<id>(.*?)</id>", entry)
+            if title:
+                t = " ".join(title.group(1).split())
+                who = ", ".join(authors[:3]) + (" et al." if len(authors) > 3 else "")
+                sources.append({"ref": f"{who}, \"{t},\" arXiv, {year}.",
+                                "doi": (aid.group(1) if aid else ""),
+                                "summary": (" ".join(summ.group(1).split())[:1500]) if summ else ""})
+    except Exception:
+        pass
+
     try:
         r = requests.get("https://api.crossref.org/works",
-                         params={"query": topic, "rows": 6, "select": "title,author,DOI,"
+                         params={"query": topic, "rows": 5, "select": "title,author,DOI,"
                                  "container-title,issued"}, timeout=15)
         for item in r.json().get("message", {}).get("items", []):
             title = (item.get("title") or ["?"])[0]
@@ -529,20 +552,30 @@ def _fetch_sources(topic: str) -> List[Dict[str, str]]:
             year = str((item.get("issued", {}).get("date-parts") or [[""]])[0][0])
             venue = (item.get("container-title") or [""])[0]
             sources.append({"ref": f"{authors}, \"{title},\" {venue}, {year}.",
-                            "doi": item.get("DOI", ""),
-                            "summary": ""})
+                            "doi": item.get("DOI", ""), "summary": ""})
     except Exception:
         pass
+
     try:
         r = requests.get("https://en.wikipedia.org/api/rest_v1/page/summary/"
                          + topic.replace(" ", "_"), timeout=10,
                          headers={"User-Agent": "SpideyPlatform/1.0"})
-        if r.ok:
+        if r.ok and r.json().get("extract"):
             j = r.json()
-            if j.get("extract"):
-                sources.append({"ref": f"Wikipedia contributors, \"{j.get('title', topic)},\" "
-                                       "Wikipedia, The Free Encyclopedia.",
-                                "doi": "", "summary": j["extract"][:1500]})
+            sources.append({"ref": f"Wikipedia contributors, \"{j.get('title', topic)},\" "
+                                   "Wikipedia, The Free Encyclopedia.",
+                            "doi": "", "summary": j["extract"][:1500]})
+    except Exception:
+        pass
+
+    # Anything already crawled into the Knowledge Nexus about this topic — lets the
+    # user seed datasheets/manuals (e.g. the hand's RS485 manual) and have the paper
+    # actually cite them.
+    try:
+        from .nexus import hybrid_search
+        for h in hybrid_search(topic, k=4):
+            sources.append({"ref": f"{h['title'] or h['url']}. Available: {h['url']}",
+                            "doi": "", "summary": h["snippet"]})
     except Exception:
         pass
     return sources
