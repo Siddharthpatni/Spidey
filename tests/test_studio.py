@@ -124,3 +124,16 @@ def test_media_image_without_backend_explains_how(client):
     r = client.post("/api/media/image", json={"prompt": "a red spider"})
     assert r.status_code == 501
     assert "Stable Diffusion" in r.json()["detail"]
+
+
+# ---------------------------------- demo mode -------------------------------- #
+def test_demo_seed_populates_every_module(client):
+    r = client.post("/api/demo/seed").json()
+    assert "seeded" in r  # idempotent — only fills empty tables
+    st = client.get("/api/demo/status").json()
+    # totals reflect a populated platform regardless of prior test state
+    assert st["docs"] >= 3 and st["memories"] >= 4 and st["events"] >= 60
+    assert st["graph_nodes"] > 0 and st["vehicles"] >= 1
+    # the seeded corpus is really searchable
+    ans = client.post("/api/research/ask", json={"question": "what is self-attention?"}).json()
+    assert ans["citations"]

@@ -27,8 +27,8 @@ def mount_platform(app: Any) -> None:
     from .core import auth, db, metrics, queue, scheduler
     from .core.queue import default_queue
     from .dashboard import DASHBOARD_HTML
-    from .modules import (analytics, brain, chat_history, codeassist, docgen,
-                          driving, email_assistant, filepipe, fleet, jobs,
+    from .modules import (analytics, brain, chat_history, codeassist, demo,
+                          docgen, driving, email_assistant, filepipe, fleet, jobs,
                           llmgateway, media, memory_engine, nexus, research,
                           sessions, team, webauto)
 
@@ -38,7 +38,7 @@ def mount_platform(app: Any) -> None:
     for mod in (webauto, filepipe, analytics, fleet, jobs, research,
                 codeassist, email_assistant, driving, team, llmgateway,
                 docgen, sessions, brain, media, nexus, memory_engine,
-                chat_history):
+                chat_history, demo):
         app.include_router(mod.router, dependencies=guarded)
         register = getattr(mod, "register_jobs", None)
         if register:

@@ -549,9 +549,26 @@ const ALL = [
 
 function HomeView({ select }) {
   const [st, setSt] = useState(null)
+  const [demo, setDemo] = useState(null)
   useEffect(() => { (async () => { try { const [h, llm] = await Promise.all([api('GET', '/api/health'), api('GET', '/api/llm/stats')]); setSt({ h, llm }) } catch { setSt('err') } })() }, [])
   const cards = ALL.filter((t) => t.desc)
+  const loadDemo = async () => {
+    setDemo('loading')
+    try { const r = await api('POST', '/api/demo/seed'); setDemo(r.seeded || {}) }
+    catch (e) { setDemo({ error: e.message }) }
+  }
   return (<>
+    <div className="card" style={{ marginBottom: '1rem', borderColor: 'var(--red)' }}>
+      <div style={{ display: 'flex', gap: '.8rem', alignItems: 'center', flexWrap: 'wrap' }}>
+        <div style={{ flex: '1 1 240px', minWidth: 0 }}>
+          <b style={{ fontSize: '1rem' }}>✨ New here? Load the live demo</b>
+          <div style={{ color: 'var(--dim)', fontSize: '.85rem', marginTop: '.2rem' }}>One click populates every module with real sample data — a knowledge graph, memories, analytics, a fleet, a near-collision drive, a generated résumé. Great for a first look.</div>
+        </div>
+        <button onClick={loadDemo} disabled={demo === 'loading'}>{demo === 'loading' ? 'Loading…' : 'Load demo data'}</button>
+      </div>
+      {demo && demo !== 'loading' && !demo.error && <div style={{ marginTop: '.6rem', color: 'var(--green)', fontSize: '.82rem' }}>✓ Demo loaded — open Knowledge Graph, Analytics, Fleet, Memory to see it. The stats below are now live.</div>}
+      {demo && demo.error && <div style={{ marginTop: '.6rem' }} className="bad">✗ {demo.error}</div>}
+    </div>
     {st && st !== 'err' && <div className="stats">{[[st.h.modules.length, 'AI modules'], [(st.h.queue || {}).done || 0, 'jobs done'], [st.llm.totals.calls || 0, 'LLM calls'], ['$' + (st.llm.totals.cost_usd || 0), 'est. spend'], [Object.values(st.h.optional).filter(Boolean).length + '/' + Object.keys(st.h.optional).length, 'extras on']].map(([v, l], i) => <div className="stat" key={i}><b>{v}</b><span>{l}</span></div>)}</div>}
     {st === 'err' && <div className="out"><span className="bad">server unreachable — is spidey serve running?</span></div>}
     <p className="desc">Your friendly neighborhood AI suite — every tool runs on <b>this machine</b>, and because your session lives in the database it follows you to any device on the same Wi-Fi. Pick a tool; files you generate download straight to your computer.</p>

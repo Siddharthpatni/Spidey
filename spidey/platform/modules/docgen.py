@@ -499,18 +499,43 @@ def create_document(kind: str, fmt: str, title: str, prompt: str, details: str) 
 
 
 # --------------------- deep-research IEEE paper pipeline --------------------- #
+# Each section: (heading, word target, focused retrieval query, writing instruction).
+# Richer structure + per-section retrieval + concrete-spec prompting = a paper with
+# the depth of a real seminar submission, not a generic essay.
 PAPER_SECTIONS = [
-    ("Abstract", "Write the Abstract (150-250 words): problem, approach, key findings."),
-    ("I. Introduction", "Write the Introduction: motivation, problem statement, "
-                        "contributions as a bulleted list, paper organization."),
-    ("II. Related Work", "Write Related Work: survey the area, cite the provided "
-                         "sources as [n] matching the reference list."),
-    ("III. Methodology", "Write the Methodology: the approach/system/algorithm in "
-                         "technical depth; describe architecture and design choices."),
-    ("IV. Results and Discussion", "Write Results and Discussion: expected/observed "
-                                   "outcomes, comparisons, limitations. Be honest "
-                                   "about what is analysis vs. measurement."),
-    ("V. Conclusion", "Write the Conclusion: findings, implications, future work."),
+    ("Abstract", 200, "overview problem approach findings",
+     "Write the Abstract (180-250 words) as one dense paragraph: the problem, the "
+     "specific system studied, the approach, and the 2-3 most concrete findings "
+     "(cite exact figures from the sources — voltages, currents, interfaces, data "
+     "rates — where available). If no physical measurements exist yet, say so plainly."),
+    ("I. Introduction", 500, "motivation background problem statement",
+     "Write the Introduction: why the problem matters, the concrete gap, then an "
+     "explicit bulleted list of this paper's contributions, and a sentence on paper "
+     "organization. Cite [n] for claims. Formal, specific, no filler."),
+    ("II. Background and Related Work", 550, "prior work related systems literature survey",
+     "Survey the relevant prior work and background using the references — group by "
+     "theme, compare approaches, and position this work against them. Cite [n] "
+     "throughout matching the reference list. Do not invent citations."),
+    ("III. System Description", 600, "hardware specifications interfaces datasheet specs",
+     "Characterise each hardware component and its interfaces STRICTLY from the source "
+     "specs: dimensions, degrees of freedom, actuators, sensors, supply voltage/current, "
+     "communication buses (RS485/EtherCAT/etc.), connectors, data rates. Use exact "
+     "numbers from the sources; where a spec is unknown, state that it is unspecified."),
+    ("IV. Integration Design", 650, "integration electrical mechanical software constraints power",
+     "Derive the integration design: mechanical mounting, the electrical budget (compare "
+     "the component's draw against what the arm's tool connector supplies — quantify any "
+     "mismatch), and the software/communication path. Present concrete design options "
+     "with trade-offs. This is the core engineering contribution — be quantitative."),
+    ("V. Use Cases", 450, "applications use cases tasks manipulation",
+     "Describe 4-6 concrete use-case families the integrated system enables, each with "
+     "a short rationale tied to the hardware's capabilities (dexterity, tactile sensing)."),
+    ("VI. Evaluation Plan", 450, "evaluation protocol metrics experiments methodology",
+     "Specify a staged evaluation protocol with concrete metrics and procedures. If no "
+     "measurements have been taken yet, frame this as a pre-registered plan and say so "
+     "honestly — do NOT fabricate results."),
+    ("VII. Conclusion", 300, "conclusion contributions future work",
+     "Conclude: restate the contribution, the key quantitative findings, honest "
+     "limitations, and specific future work."),
 ]
 
 
@@ -587,36 +612,76 @@ def _paper_progress(run_id: int, status: str, stage: str, done: List[str]) -> No
                (status, db.json_dumps({"stage": stage, "sections_done": done}), run_id))
 
 
+def _section_context(query: str, sources: List[Dict[str, str]]) -> str:
+    """Per-section retrieval: the most relevant crawled Nexus chunks + source
+    abstracts for THIS section, so each section is grounded in real material
+    (the datasheet spec numbers land in System Description, etc.)."""
+    ctx = []
+    try:
+        from .nexus import hybrid_search
+        for h in hybrid_search(query, k=4):
+            if h.get("snippet"):
+                ctx.append(f"[from {h['url']}] {h['snippet']}")
+    except Exception:
+        pass
+    # plus the most on-topic source abstracts
+    for s in sources:
+        if s.get("summary") and any(w in s["summary"].lower() for w in query.lower().split()):
+            ctx.append(s["summary"][:600])
+    return "\n\n".join(ctx[:6])[:3000]
+
+
 def _job_research_paper(payload: Dict[str, Any]) -> Dict[str, Any]:
     run_id, topic, fmt = payload["run_id"], payload["topic"], payload.get("format", "pdf")
+    author = payload.get("author", "")
+    affiliation = payload.get("affiliation", "")
+    email = payload.get("email", "")
     try:
-        _paper_progress(run_id, "researching", "fetching sources (Crossref + Wikipedia)", [])
+        _paper_progress(run_id, "researching", "fetching sources (arXiv + web + Nexus)", [])
         sources = _fetch_sources(topic)
         db.execute("UPDATE paper_runs SET sources=? WHERE id=?",
                    (db.json_dumps(sources), run_id))
         refs_block = "\n".join(f"[{i}] {s['ref']}" + (f" doi:{s['doi']}" if s["doi"] else "")
                                for i, s in enumerate(sources, 1)) or "[1] (no sources reachable)"
-        background = "\n\n".join(s["summary"] for s in sources if s["summary"])
 
-        parts = [f"# {topic}", "", "*Generated by Spidey Document Studio — draft for review*", ""]
+        # IEEE-style header block
+        parts = [f"# {topic}", ""]
+        if author:
+            parts += [author]
+        if affiliation:
+            parts += [affiliation]
+        if email:
+            parts += [email]
+        parts += ["", "*Draft generated by Spidey — verify all figures against the "
+                  "primary sources before submission.*", ""]
+
         done: List[str] = []
-        for name, instruction in PAPER_SECTIONS:
+        prior = ""   # rolling summary of the paper so far, for continuity
+        for name, words, query, instruction in PAPER_SECTIONS:
             _paper_progress(run_id, "writing", f"writing {name}", done)
+            ctx = _section_context(f"{topic} {query}", sources)
             section = llmutil.ask(
-                f"TOPIC: {topic}\n\nAVAILABLE REFERENCES (cite as [n]):\n{refs_block}\n\n"
-                + (f"BACKGROUND MATERIAL:\n{background[:2500]}\n\n" if background else "")
-                + (f"PAPER SO FAR (for continuity):\n{chr(10).join(parts)[-2500:]}\n\n")
-                + f"{instruction}\nOutput Markdown for this section only, starting with "
-                  f"'## {name}'. Dense, technical, no fluff.",
-                system="You are an experienced IEEE conference paper author. Rigorous, "
-                       "precise, honest about limitations. Never fabricate citations — "
-                       "only cite the provided reference list.")
+                f"You are writing the '{name}' section of an IEEE-style paper.\n"
+                f"PAPER TOPIC: {topic}\n\n"
+                f"REFERENCES (cite as [n], never invent):\n{refs_block}\n\n"
+                + (f"SOURCE MATERIAL for this section (use the concrete facts/numbers "
+                   f"here):\n{ctx}\n\n" if ctx else "")
+                + (f"WHAT THE PAPER HAS COVERED SO FAR:\n{prior[-1500:]}\n\n" if prior else "")
+                + f"TASK: {instruction}\nAim for about {words} words. Formal IEEE prose, "
+                  f"specific and quantitative, no filler or marketing language. Output "
+                  f"Markdown starting with '## {name}'.",
+                system="You are an experienced IEEE author writing a rigorous seminar "
+                       "paper. Be precise and quantitative, ground every claim in the "
+                       "provided sources, cite as [n], and be explicitly honest when "
+                       "something is unmeasured or unspecified. Never fabricate results "
+                       "or citations.")
             if section is None:
                 raise RuntimeError("deep research needs a model — start Ollama (`spidey up`)")
             if not section.lstrip().startswith("##"):
                 section = f"## {name}\n\n{section}"
             parts += [section.strip(), ""]
             done.append(name)
+            prior += f" {name}: " + " ".join(section.split()[:60])
         parts += ["## References", ""] + [f"[{i}] {s['ref']}" for i, s in enumerate(sources, 1)]
         markdown = "\n".join(parts)
 
@@ -703,6 +768,9 @@ def api_render(body: RenderIn) -> dict:
 class PaperIn(BaseModel):
     topic: str
     format: str = "pdf"
+    author: str = ""
+    affiliation: str = ""
+    email: str = ""
 
 
 @router.post("/paper")
@@ -719,7 +787,9 @@ def start_paper(body: PaperIn) -> dict:
                         (body.topic.strip(), db.now()))
     from ..core.queue import default_queue
     default_queue().enqueue("docgen.paper", {"run_id": run_id, "topic": body.topic.strip(),
-                                             "format": body.format}, max_attempts=1)
+                                             "format": body.format, "author": body.author,
+                                             "affiliation": body.affiliation, "email": body.email},
+                            max_attempts=1)
     return {"id": run_id, "status": "queued",
             "note": "poll GET /api/docgen/paper/{id} — sections appear as they're written"}
 

@@ -129,4 +129,17 @@
   .studio.drawer .backdrop { display:block; }
   .studio .brand .x { display:block; }
 }
+/* ---- phones: stack form controls full-width, 2-col stats, no squeeze ---- */
+@media (max-width:480px){
+  .studio .row { gap:.5rem; }
+  .studio .row > * { flex:1 1 100%; }          /* one control per line */
+  .studio .row > button { width:100%; }
+  .studio .stats { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .studio .content { padding:.85rem; }
+  .studio .card { padding:.85rem; }
+  .studio .chip { font-size:.68rem; }
+  .studio .tile { padding:.85rem; }
+}
+/* ultrawide: keep the reading column sane, don't stretch forever */
+@media (min-width:1700px){ .studio .content { max-width:1200px; } }
 @media (prefers-reduced-motion:reduce){ .studio *{ animation:none!important; transition:none!important; } }
