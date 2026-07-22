@@ -68,7 +68,10 @@ export const defaultConfig = {
   workdir: '',
   safety: 'off',
   max_steps: 25,
-  think: true,   // show the model's reasoning as a live "thinking" block in chat
+  // Native model "thinking" is OFF by default — on local models it adds ~2 min/step.
+  // The reasoning web already shows each step; turn this on in Settings for a
+  // deliberate, show-the-reasoning mode.
+  think: false,
 }
 
 // A stable per-browser id so, on a shared instance, each friend's chats are
